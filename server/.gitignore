@@ -1,0 +1,9 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Convex server
+server/node_modules/
+server/.env.local
+server/convex/_generated/
