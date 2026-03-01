@@ -118,6 +118,11 @@ Report: vehicle selected, pickup location & date/time, drop-off location{step6_l
     )
 
     await browser.start()
+    # Disable StorageStateWatchdog — it crashes on page-detach events during
+    # navigation, triggering a full session reset that kills the agent.
+    # We only need user_data_dir to *load* cookies, not to persist them.
+    if browser._storage_state_watchdog is not None:
+        browser._storage_state_watchdog = None
     await browser._cdp_add_init_script("""
         navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
         navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
