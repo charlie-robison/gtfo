@@ -7,9 +7,10 @@ interface AgentScreenshotProps {
   url: string;
   status: string;
   compact?: boolean;
+  screenshotUrl?: string | null;
 }
 
-export function AgentScreenshot({ url, status, compact }: AgentScreenshotProps) {
+export function AgentScreenshot({ url, status, compact, screenshotUrl }: AgentScreenshotProps) {
   return (
     <div className={cn(
       "rounded overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col",
@@ -26,16 +27,26 @@ export function AgentScreenshot({ url, status, compact }: AgentScreenshotProps) 
           <p className="text-[8px] text-zinc-500 truncate font-mono">{url}</p>
         </div>
       </div>
-      {/* Screenshot area — fills all remaining space */}
+      {/* Screenshot area — shows real image or placeholder */}
       <div className={cn(
         "flex-1 min-h-0 relative flex items-center justify-center",
-        status === "running" && "animate-pulse",
+        status === "running" && !screenshotUrl && "animate-pulse",
       )}>
-        <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-white to-transparent" />
-        <div className="flex flex-col items-center gap-0.5 text-zinc-700">
-          <Monitor className="w-4 h-4" />
-          <span className="text-[8px] font-mono">Live View</span>
-        </div>
+        {screenshotUrl ? (
+          <img
+            src={screenshotUrl}
+            alt="Live screenshot"
+            className="absolute inset-0 w-full h-full object-cover object-top"
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-white to-transparent" />
+            <div className="flex flex-col items-center gap-0.5 text-zinc-700">
+              <Monitor className="w-4 h-4" />
+              <span className="text-[8px] font-mono">Live View</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
