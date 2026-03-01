@@ -171,7 +171,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Activity feed sidebar */}
+        {/* Logs sidebar */}
         <div className="hidden lg:block w-72 shrink-0 overflow-auto">
           <ActivityFeed />
         </div>

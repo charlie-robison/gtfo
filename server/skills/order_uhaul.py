@@ -69,28 +69,12 @@ async def order_uhaul(
         step4 = "1. If a Moving Help or Moving Labor add-on page appears, skip it — click Continue or Next to proceed without adding labor."
         step6_labor = ""
 
-    task = f"""
-You have two tabs already open:
-  - Tab 1: https://www.uhaul.com (U-Haul homepage)
-  - Tab 2: https://mail.google.com/ (Gmail — for OTP codes if needed)
-
-Start on Tab 1 (the U-Haul tab).
+    task = f"""Two tabs are open: Tab 1 = uhaul.com, Tab 2 = Gmail (for OTP). Start on Tab 1.
 
 STEP 1 — Sign in (skip if already signed in):
-1. First, check if you are ALREADY signed in — look for a greeting, account icon, "My Account", or your name in the header.
-   - If you ARE already signed in, skip directly to STEP 2.
-2. If NOT signed in, look for a "Sign In" link or button (usually in the top-right header area) and click it.
-3. Enter email x_uhaul_email and password x_uhaul_pass to sign in.
-4. If a CAPTCHA or verification appears that you cannot solve, wait a moment and try again.
-5. If a One-Time Password (OTP) / verification code screen appears, do the following:
-   a. Switch to Tab 2 (Gmail tab — it should already be open).
-   b. If prompted to sign in to Gmail, enter email x_uhaul_email, click Next, then enter password x_uhaul_pass, and click Next.
-   c. Once in the inbox, look for the most recent email from U-Haul (sender may contain "uhaul" or "U-Haul"). Open it.
-   d. Find the one-time password / verification code in the email body. It is usually a 6-digit number.
-   e. Copy or remember that code.
-   f. Switch back to Tab 1 (the U-Haul tab).
-   g. Enter the OTP code into the verification field and submit it.
-6. Confirm you are signed in (look for a greeting, account icon, or "My Account" link).
+If you see a greeting or "My Account" in the header, skip to STEP 2.
+Otherwise: click "Sign In", enter x_uhaul_email and x_uhaul_pass.
+If OTP is required: switch to Tab 2 (Gmail), sign in with x_uhaul_email / x_uhaul_pass if needed, find the latest U-Haul email, copy the 6-digit code, switch back to Tab 1, enter the code and submit.
 
 STEP 2 — Start a reservation:
 1. On the homepage (or navigate back to it), find the reservation / quote form.
@@ -103,32 +87,24 @@ STEP 2 — Start a reservation:
 4. Click "Get Rates" or the equivalent search / submit button.
 
 STEP 3 — Choose a vehicle:
-1. On the results page, browse the available vehicles.
-2. Look for a {vehicle_type}. Pick the cheapest option that matches "{vehicle_type}" (e.g. a 10' truck if truck is requested and it is the cheapest).
-3. Click the "Reserve" or "Add to Order" button for that vehicle.
+Select the cheapest {vehicle_type} and click "Reserve" / "Select".
 
-STEP 4 — Add Moving Help (labor package):
+STEP 4 — Moving Help:
 {step4}
 
-STEP 5 — Proceed through the reservation flow:
-1. Continue through any remaining pages (coverage/protection options, equipment add-ons, etc.).
-   - You may skip or decline optional extras unless they are required.
-2. Keep clicking "Continue", "Next", or the equivalent button to advance.
+STEP 5 — Continue through remaining pages:
+Decline all optional extras (coverage, protection, equipment, Safetrip). Click "Continue" / "Next" / "No Thanks" to advance. On the cart page click "Check Out".
 
 STEP 6 — STOP before payment:
-1. As soon as you reach a page that asks for credit card or payment information, STOP.
-2. Do NOT enter any payment details. Do NOT click any "Complete Reservation" or "Place Order" button.
-3. Report back that the reservation is ready for payment and summarize:
-   - Vehicle selected
-   - Pickup location & date/time
-   - Drop-off location{step6_labor}
-   - Total estimated cost shown on the page
+When you see a credit card / payment form, STOP. Do NOT enter payment info.
+Report: vehicle selected, pickup location & date/time, drop-off location{step6_labor}, total estimated cost.
 """
 
     browser = Browser(
         headless=False,
         keep_alive=True,
         user_data_dir=UHAUL_PROFILE_DIR,
+        enable_default_extensions=False,
         args=[
             "--disable-features=AutofillServerCommunication",
             "--disable-save-password-bubble",
@@ -171,12 +147,14 @@ STEP 6 — STOP before payment:
             "x_uhaul_pass": UHAUL_PASSWORD,
         },
         use_vision=True,
+        max_actions_per_step=10,
+        use_judge=False,
     )
     bg_task = None
     if screenshot_loop:
         bg_task = asyncio.create_task(screenshot_loop(browser))
     try:
-        result = await agent.run()
+        result = await agent.run(max_steps=40)
     finally:
         if bg_task:
             bg_task.cancel()

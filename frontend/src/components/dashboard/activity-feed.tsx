@@ -1,9 +1,9 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, Info, AlertTriangle, XCircle } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockActivity } from "@/data/mock-activity";
+import { useOpenClawLogs } from "@/hooks/use-openclaw-logs";
 import { ActivityEvent } from "@/types";
 
 const iconMap = {
@@ -20,7 +20,7 @@ const colorMap = {
   error: "text-red-400",
 };
 
-function ActivityItem({ event }: { event: ActivityEvent }) {
+function LogItem({ event }: { event: ActivityEvent }) {
   const Icon = iconMap[event.type];
   return (
     <div className="flex items-start gap-2 py-1.5">
@@ -34,16 +34,27 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
 }
 
 export function ActivityFeed() {
+  const { logs, isLoading, error } = useOpenClawLogs();
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="p-3 pb-2 shrink-0">
         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Recent Activity
+          Logs
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 pt-0 flex-1 overflow-auto">
-        {mockActivity.map((event) => (
-          <ActivityItem key={event.id} event={event} />
+        {isLoading && logs.length === 0 && (
+          <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Fetching logs...
+          </div>
+        )}
+        {error && logs.length === 0 && (
+          <p className="text-xs text-red-400 py-2">{error}</p>
+        )}
+        {logs.map((event) => (
+          <LogItem key={event.id} event={event} />
         ))}
       </CardContent>
     </Card>
