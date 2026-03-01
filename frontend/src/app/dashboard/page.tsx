@@ -8,7 +8,7 @@ import { AgentOverlay } from "@/components/agents/agent-overlay";
 import { useJobStreams, type JobStream } from "@/hooks/use-job-streams";
 import { cancelJob } from "@/lib/endpoints";
 import { AgentSession } from "@/types";
-import { Loader2, RefreshCw, Search, Mail, type LucideIcon } from "lucide-react";
+import { Loader2, RefreshCw, Search, Mail, Truck, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OverrideDialog } from "@/components/dashboard/override-dialog";
 import {
@@ -48,6 +48,7 @@ const jobTypeLabels: Record<string, string> = {
   update_cashapp_address: "Cash App",
   update_southwest_address: "Southwest",
   update_doordash_address: "DoorDash",
+  moving_analysis: "Moving Analysis",
   determine_addresses: "Finding Sites to Change Addresses",
   cancel_lease: "Send Cancel Email",
 };
@@ -64,6 +65,7 @@ const cancellableJobTypes = new Set([
 
 /** Job types that show a hero icon instead of a browser screenshot. */
 const heroIcons: Record<string, LucideIcon> = {
+  moving_analysis: Truck,
   determine_addresses: Search,
   cancel_lease: Mail,
 };

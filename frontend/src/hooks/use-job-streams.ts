@@ -50,7 +50,10 @@ export function useJobStreams() {
 
       setError(null);
     } catch (e: any) {
-      setError(e.message ?? String(e));
+      // Only show error if we have no existing data — don't wipe cards on transient failures
+      if (streamsRef.current.length === 0) {
+        setError(e.message ?? String(e));
+      }
     } finally {
       setLoading(false);
     }
@@ -65,13 +68,20 @@ export function useJobStreams() {
       ids.map((id) => getScreenshotsByJobId(id))
     );
 
+    // Build a map of jobId → screenshots so we match by ID, not index
+    const screenshotMap = new Map<string, Screenshot[]>();
+    ids.forEach((id, i) => {
+      const result = results[i];
+      if (result && result.status === "fulfilled") {
+        screenshotMap.set(id, result.value);
+      }
+    });
+
     setStreams((prev) => {
       let changed = false;
-      const next = prev.map((stream, i) => {
-        const result = results[i];
-        if (!result || result.status === "rejected") return stream;
-
-        const screenshots = result.value;
+      const next = prev.map((stream) => {
+        const screenshots = screenshotMap.get(stream.job._id);
+        if (!screenshots) return stream;
         if (screenshots.length === stream.screenshots.length) return stream;
 
         changed = true;

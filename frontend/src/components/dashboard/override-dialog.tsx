@@ -85,7 +85,8 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
             <Label htmlFor="override-street">Street Address</Label>
             <Input
               id="override-street"
-              placeholder="456 Oak Ave"
+              placeholder="800 Indiana Street"
+              defaultValue="800 Indiana Street"
               required
             />
           </div>
@@ -95,7 +96,8 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
               <Label htmlFor="override-city">City</Label>
               <Input
                 id="override-city"
-                placeholder="Sacramento"
+                placeholder="San Francisco"
+                defaultValue="San Francisco"
                 required
               />
             </div>
@@ -104,6 +106,7 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
               <Input
                 id="override-state"
                 placeholder="CA"
+                defaultValue="CA"
                 required
               />
             </div>
@@ -111,7 +114,8 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
               <Label htmlFor="override-zip">Zip</Label>
               <Input
                 id="override-zip"
-                placeholder="95814"
+                placeholder="94107"
+                defaultValue="94107"
                 required
               />
             </div>
@@ -122,8 +126,8 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
               <Label htmlFor="override-name">Full Name</Label>
               <Input
                 id="override-name"
-                placeholder="Charlie Robison"
-                defaultValue="Charlie Robison"
+                placeholder="Brycen Mcormick"
+                defaultValue="Brycen Mcormick"
                 required
               />
             </div>
@@ -144,7 +148,7 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
             <Input
               id="override-move-date"
               type="date"
-              defaultValue="2026-02-28"
+              defaultValue="2026-03-12"
               required
             />
           </div>
