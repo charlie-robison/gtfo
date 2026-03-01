@@ -35,6 +35,7 @@ async def search_and_contact_redfin_rentals(
     min_bedrooms: int = 1,
     min_bathrooms: int = 1,
     max_results: int = 10,
+    screenshot_loop=None,
 ):
     """
     Search Redfin for rental listings and fill out the contact form for each
@@ -66,43 +67,33 @@ async def search_and_contact_redfin_rentals(
     move_in_filter = ""
     if max_move_in_cost > 0:
         move_in_filter = f"""
-STEP 4 — Filter by move-in cost:
+STEP 3b — Filter by move-in cost (before opening tabs):
 1. For each listing you collected, check if the listing mentions a security deposit or move-in cost.
 2. Estimate the total move-in cost as: first month's rent + security deposit (if listed).
    - If no deposit info is shown, assume the deposit equals one month's rent.
 3. Exclude any listing where the estimated move-in cost exceeds ${max_move_in_cost:,}.
+Only open tabs for listings that pass this filter.
 """
 
     task = f"""
 Go to https://www.redfin.com and do the following:
 
 IMPORTANT — Human-like pacing (applies throughout the ENTIRE session):
-Redfin does not use heavy CAPTCHAs, but you must still behave like a real
-human to avoid triggering rate-limits or bot detection:
-  - Wait 5–15 seconds between major navigation actions (searching, opening
+  - Wait 2–4 seconds between major navigation actions (searching, opening
     a listing, clicking "Contact").
-  - Wait 2–3 seconds between filling individual form fields.
-  - Scroll naturally — do not jump straight to elements. Scroll down the
-    page in small increments, pausing briefly as you go.
+  - Wait 1–2 seconds between filling individual form fields.
   - If you see any CAPTCHA or "are you a robot?" challenge, wait 10 seconds
     and then attempt to solve it normally.
 
-SESSION WARMING (do this FIRST):
-1. Navigate to https://www.redfin.com and wait 5 seconds for the page to
-   fully load. Do NOT immediately interact with the search bar.
-2. Scroll down slowly about 30% of the page, then scroll back up. Wait 3
-   seconds.
-3. Once the Redfin homepage is visible, proceed.
-
 STEP 1 — Navigate to rentals & search:
-1. Look for a "Rent" tab/link near the top of the page and click it to
-   switch to the rental search mode. This may take you to redfin.com/rentals
-   or similar.
-2. Find the search bar.
-3. Type "{city}, {state}" into the search bar.
-4. Wait 2–3 seconds for the autocomplete suggestions to appear.
-5. Select the correct city/state suggestion from the dropdown (click it).
-6. Wait for the rental search results to load (5–10 seconds).
+1. Navigate to https://www.redfin.com and wait 3 seconds for the page to load.
+2. Look for a "Rent" tab/link near the top of the page and click it to
+   switch to the rental search mode.
+3. Find the search bar.
+4. Type "{city}, {state}" into the search bar.
+5. Wait 2 seconds for the autocomplete suggestions to appear.
+6. Select the correct city/state suggestion from the dropdown (click it).
+7. Wait for the rental search results to load (3–5 seconds).
 
 STEP 2 — Apply filters:
 1. Set the maximum rent (price) filter to ${max_rent:,}/mo.
@@ -114,9 +105,9 @@ STEP 2 — Apply filters:
 3. Set bathrooms to {min_bathrooms}+ bathrooms.
    - Look for a "Baths" or "Bathrooms" filter and set the minimum to
      {min_bathrooms}.
-4. Wait 5 seconds for the filtered results to update.
+4. Wait 3 seconds for the filtered results to update.
 
-STEP 3 — Collect listings:
+STEP 3 — Collect listing URLs:
 1. Browse the search results list.
 2. For up to {max_results} listings, collect the following information for each:
    - Full address
@@ -127,17 +118,21 @@ STEP 3 — Collect listings:
    - The Redfin listing URL (the link to the individual listing page)
 3. If the first page does not have enough results, go to page 2 if available.
 {move_in_filter}
-STEP 5 — Fill contact form for EACH listing (DEMO — DO NOT SUBMIT):
-For each listing you collected above, do the following:
+STEP 4 — Open ALL listings in new tabs (BATCH):
+This is a speed optimization — open every listing at once instead of one at a time.
+1. For EACH listing URL you collected, open it in a NEW TAB (use new_tab=True
+   or Ctrl+Click). Do this for ALL listings before proceeding.
+2. Wait 3 seconds after opening all tabs so pages can load in the background.
 
-  5a. Navigate to the listing URL.
-  5b. Wait 5–10 seconds for the page to fully load. Scroll down slowly to
-      view the listing details.
+STEP 5 — Fill contact forms by cycling through tabs (DEMO — DO NOT SUBMIT):
+Now switch through each listing tab one by one and fill the contact form:
+
+  5a. Switch to the next listing tab.
+  5b. Wait 2–3 seconds for the page to be fully loaded.
   5c. Look for a button or link that says "Send Message", "Contact Property",
       "Request a Tour", "Email", "Contact Agent", or similar.
   5d. Click the most relevant contact button.
-  5e. If a form or modal appears, fill in the fields with human-like pacing
-      (2–3 seconds between each field):
+  5e. If a form or modal appears, fill in the fields (1–2 seconds between fields):
       - Name / First Name / Last Name: {full_name}
       - Email: use x_redfin_email
       - Phone: {phone}
@@ -147,10 +142,10 @@ For each listing you collected above, do the following:
   5f. *** STOP HERE — DO NOT click the final submit / send button. ***
       This is a DEMO. Confirm the form is filled correctly and note that
       the form was filled but NOT submitted.
-  5g. Wait 5 seconds, then move on to the next listing.
+  5g. Move on to the next tab immediately — no extra waiting needed.
 
 STEP 6 — Final report:
-After processing all listings, summarize:
+After processing all tabs, summarize:
    - For each listing: address, rent, bedrooms/bathrooms, square footage,
      estimated move-in cost, listing URL, and contact status
      (form filled — not submitted, no contact button found, etc.).
@@ -173,7 +168,14 @@ After processing all listings, summarize:
         },
         use_vision=True,
     )
-    result = await agent.run()
+    bg_task = None
+    if screenshot_loop:
+        bg_task = asyncio.create_task(screenshot_loop(browser))
+    try:
+        result = await agent.run()
+    finally:
+        if bg_task:
+            bg_task.cancel()
     return result
 
 

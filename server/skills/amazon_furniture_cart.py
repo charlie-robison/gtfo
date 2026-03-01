@@ -16,8 +16,16 @@ load_dotenv()
 AMAZON_EMAIL = os.getenv("AMAZON_EMAIL", "")
 AMAZON_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
 
+_CDP_DISABLE_WEBAUTHN = """\
+navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
+navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
+if (window.PublicKeyCredential) {
+    window.PublicKeyCredential.isConditionalMediationAvailable = () => Promise.resolve(false);
+    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
+}"""
 
-async def amazon_furniture_cart(furniture_items: list[str]) -> object:
+
+async def amazon_furniture_cart(furniture_items: list[str], screenshot_loop=None) -> object:
     """
     Search for furniture items on Amazon, add each to cart, and proceed to checkout.
 
@@ -28,26 +36,17 @@ async def amazon_furniture_cart(furniture_items: list[str]) -> object:
         f"   {i}. {item}" for i, item in enumerate(furniture_items, 1)
     )
 
-    task = f"""
-Go to https://www.amazon.com and do the following:
+    task = f"""\
+Go to amazon.com. Sign in with email x_amazon_email / password x_amazon_pass if prompted.
 
-1. If prompted to sign in, enter email x_amazon_email and password x_amazon_pass to log in.
+For each item below, search Amazon, pick the first well-reviewed Prime-eligible result, \
+click "Add to Cart", then search for the next item.
 
-2. For each item in the following list, search for it using the Amazon search bar,
-   pick the first reasonable and well-reviewed result (prioritize Prime-eligible items),
-   click "Add to Cart", then return to the Amazon homepage or search bar for the next item.
-
-   Items to add:
+Items:
 {numbered_items}
 
-3. After ALL items above have been added to the cart, click on the cart icon
-   and then click "Proceed to checkout".
-
-4. STOP once the checkout/payment page loads. Do NOT enter any payment information
-   and do NOT place the order.
-
-5. Report a summary of all items in the cart and the total price.
-"""
+After all items are added, click the cart icon, click "Proceed to checkout", then STOP. \
+Do NOT enter payment or place the order. Report a summary of cart items and total price."""
 
     browser = Browser(
         headless=False,
@@ -56,38 +55,35 @@ Go to https://www.amazon.com and do the following:
             "--disable-features=AutofillServerCommunication",
             "--disable-save-password-bubble",
             "--password-store=basic",
+            "--disable-extensions",
+            "--disable-default-apps",
+            "--no-first-run",
+            "--disable-translate",
+            "--disable-background-networking",
+            "--disable-sync",
         ],
     )
 
     # Start browser and disable WebAuthn/passkey API via CDP
     # This prevents the iCloud Keychain "Use a saved passkey" dialog
     await browser.start()
-    await browser._cdp_add_init_script("""
-        navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
-        navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
-        if (window.PublicKeyCredential) {
-            window.PublicKeyCredential.isConditionalMediationAvailable = () => Promise.resolve(false);
-            window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
-        }
-    """)
+    await browser._cdp_add_init_script(_CDP_DISABLE_WEBAUTHN)
 
-    llm = ChatBrowserUse()
     agent = Agent(
         task=task,
-        llm=llm,
+        llm=ChatBrowserUse(),
         browser=browser,
         sensitive_data={
             "x_amazon_email": AMAZON_EMAIL,
             "x_amazon_pass": AMAZON_PASSWORD,
         },
         use_vision=True,
+        max_actions_per_step=5,
     )
-    result = await agent.run()
-    return result
+    return await agent.run()
 
 
 if __name__ == "__main__":
-    # Example usage — sample furniture list for a move
     asyncio.run(
         amazon_furniture_cart(
             furniture_items=[

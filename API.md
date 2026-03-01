@@ -157,13 +157,88 @@ Order all recommended furniture on Amazon. Reads items from Convex DB (run `/mov
 
 ---
 
-### POST /cancel-current-lease
-
-**Not yet implemented.** Returns `null`.
-
 ### POST /determine-addresses
 
-**Not yet implemented.** Returns `null`.
+Scan the user's Gmail inbox for services that likely store their physical address, classify them with GPT-4o, and return the results. Runs synchronously — the response contains the detected services.
+
+**Input:**
+
+```json
+{
+  "old_street": "5122 Mertola Drive",
+  "old_city": "El Dorado Hills",
+  "old_state": "CA",
+  "old_zip_code": "95762"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| old_street | string | no | "" | Current street address (improves search accuracy) |
+| old_city | string | no | "" | Current city |
+| old_state | string | no | "" | Current state |
+| old_zip_code | string | no | "" | Current ZIP code |
+
+**Output:**
+
+```json
+{
+  "services": [
+    {
+      "service_name": "Amazon",
+      "category": "shopping",
+      "priority": "medium",
+      "detected_from": ["amazon.com"],
+      "email_count": 42,
+      "settings_url": "https://www.amazon.com/a/addresses",
+      "needs_address_update": true,
+      "sample_sender": "ship-confirm@amazon.com"
+    }
+  ],
+  "userEmail": "user@gmail.com",
+  "totalScanned": 150
+}
+```
+
+**Side effects:** Writes each detected service to `detected_services`.
+
+---
+
+### POST /cancel-current-lease
+
+Send a lease cancellation / notice to vacate email to the current landlord via AgentMail. Creates a background job.
+
+**Input:**
+
+```json
+{
+  "landlord_email": "landlord@example.com",
+  "tenant_name": "John Doe",
+  "current_address": "123 Main St, Sacramento, CA 95814",
+  "lease_end_date": "June 30, 2026",
+  "move_out_date": "June 30, 2026",
+  "reason": "I am relocating."
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| landlord_email | string | yes | — | Landlord's email address |
+| tenant_name | string | yes | — | Tenant's full name |
+| current_address | string | yes | — | Current rental address |
+| lease_end_date | string | yes | — | Lease end date |
+| move_out_date | string | yes | — | Intended move-out date |
+| reason | string | no | "I am relocating." | Reason for leaving |
+
+**Output:**
+
+```json
+{ "job_id": "jd7..." }
+```
+
+**Side effects:** Creates a `cancel_lease` job. Background action sends the email via AgentMail and completes the job with `{ message, sentFrom }`.
+
+---
 
 ### POST /setup-utilities
 
@@ -219,7 +294,7 @@ List all background jobs, or get one by ID.
 
 | Field | Type | Values |
 |-------|------|--------|
-| type | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` |
+| type | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` \| `determine_addresses` \| `cancel_lease` |
 | status | string | `pending` \| `running` \| `completed` \| `failed` |
 
 ---
@@ -323,6 +398,44 @@ List all furniture items recommended by the moving pipeline.
 
 ---
 
+### GET /screenshots
+
+`https://amiable-viper-68.convex.site/screenshots`
+
+List screenshots captured during browser-use skill sessions. Filter by job type or specific job ID.
+
+**Query params:** `?job_type=search_rentals` or `?job_id=jd7...` (at least one required)
+
+**Output:**
+
+```json
+[
+  {
+    "_id": "...",
+    "_creationTime": 1709312345678,
+    "jobId": "jd7...",
+    "jobType": "search_rentals",
+    "stepNumber": 3,
+    "pageUrl": "https://redfin.com/...",
+    "pageTitle": "Redfin - Apartments for Rent",
+    "storageId": "...",
+    "url": "https://amiable-viper-68.convex.cloud/api/storage/..."
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| jobId | id | Reference to the job that produced this screenshot |
+| jobType | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` |
+| stepNumber | number | Zero-indexed step in the agent's history |
+| pageUrl | string | URL the browser was on when the screenshot was taken |
+| pageTitle | string | Page title at the time of the screenshot |
+| storageId | id | Convex file storage reference |
+| url | string | Resolved public URL to the screenshot image (PNG) |
+
+---
+
 ### GET /amazon-order-summary
 
 `https://amiable-viper-68.convex.site/amazon-order-summary`
@@ -343,8 +456,8 @@ List all Amazon order summaries from furniture ordering.
 | POST | `/moving-pipeline` | Analyze house + furniture recs + schedule U-Haul |
 | POST | `/update-address` | Update Amazon delivery address |
 | POST | `/order-furniture` | Order recommended furniture on Amazon |
-| POST | `/cancel-current-lease` | Cancel current lease (TODO) |
-| POST | `/determine-addresses` | Determine addresses (TODO) |
+| POST | `/determine-addresses` | Scan Gmail for services with stored addresses |
+| POST | `/cancel-current-lease` | Send lease cancellation email to landlord |
 | POST | `/setup-utilities` | Set up utilities (TODO) |
 | GET | `/jobs` | List all jobs or get one by `?job_id=` |
 | GET | `/steps` | List all pipeline steps |
@@ -353,6 +466,7 @@ List all Amazon order summaries from furniture ordering.
 | GET | `/redfin-applications` | List all Redfin applications |
 | GET | `/uhaul-information` | List all U-Haul reservations |
 | GET | `/recommended-furniture` | List all recommended furniture |
+| GET | `/screenshots` | List screenshots by `?job_type=` or `?job_id=` |
 | GET | `/amazon-order-summary` | List all Amazon order summaries |
 
 All endpoints are at `https://amiable-viper-68.convex.site`.
@@ -374,6 +488,8 @@ These queries can also be called directly via the Convex React/JS client (real-t
 | `api.queries.listUhaulInformation` | List all U-Haul reservations |
 | `api.queries.listRecommendedFurniture` | List all recommended furniture |
 | `api.queries.listAmazonOrderSummary` | List all Amazon order summaries |
+| `api.queries.listScreenshotsByJobType` | List screenshots by job type (with resolved URLs) |
+| `api.queries.listScreenshotsByJobId` | List screenshots by job ID (with resolved URLs) |
 
 ---
 
@@ -388,3 +504,5 @@ Called by Convex actions only. Not for direct client use.
 | `POST /run-order-uhaul` | Run U-Haul browser agent, return parsed result |
 | `POST /run-update-address` | Run Amazon address update browser agent |
 | `POST /run-order-furniture` | Run Amazon furniture cart browser agent |
+| `POST /run-determine-addresses` | Scan Gmail, classify services with stored addresses |
+| `POST /run-cancel-lease` | Send lease cancellation email via AgentMail |

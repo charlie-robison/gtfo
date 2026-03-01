@@ -99,7 +99,6 @@ Go to https://www.amazon.com/a/addresses and do the following:
     finally:
         if bg_task:
             bg_task.cancel()
-
     return result
 
 

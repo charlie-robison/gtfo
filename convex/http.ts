@@ -280,60 +280,64 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /screenshots/upload ───────────────────────────────────
+// ── POST /cancel-current-lease ───────────────────────────────────
 
 http.route({
-  path: "/screenshots/upload",
+  path: "/cancel-current-lease",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const body = await request.json();
-    const { jobId, jobType, stepNumber, pageUrl, pageTitle, screenshotBase64 } = body;
 
-    const binary = Uint8Array.from(atob(screenshotBase64), (c) =>
-      c.charCodeAt(0),
-    );
-    const blob = new Blob([binary], { type: "image/png" });
-    const storageId = await ctx.storage.store(blob);
+    const params = {
+      landlordEmail: body.landlord_email,
+      tenantName: body.tenant_name,
+      currentAddress: body.current_address,
+      leaseEndDate: body.lease_end_date,
+      moveOutDate: body.move_out_date,
+      reason: body.reason ?? "I am relocating.",
+    };
 
-    await ctx.runMutation(api.mutations.insertScreenshot, {
-      jobId: jobId ?? "",
-      jobType: jobType ?? "",
-      stepNumber: stepNumber ?? 0,
-      pageUrl: pageUrl ?? "",
-      pageTitle: pageTitle ?? "",
-      storageId,
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "cancel_lease",
+      params,
     });
 
-    return jsonResponse({ ok: true, storageId });
+    await ctx.scheduler.runAfter(0, api.actions.runCancelLease, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
   }),
 });
 
 http.route({
-  path: "/screenshots/upload",
-  method: "OPTIONS",
-  handler: httpAction(async () => corsPreflightResponse()),
-});
-
-// ── POST /cancel-current-lease (TODO) ───────────────────────────
-
-http.route({
-  path: "/cancel-current-lease",
-  method: "POST",
-  handler: httpAction(async () => jsonResponse(null)),
-});
-
-http.route({
   path: "/cancel-current-lease",
   method: "OPTIONS",
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /determine-addresses (TODO) ────────────────────────────
+// ── POST /determine-addresses ────────────────────────────────────
 
 http.route({
   path: "/determine-addresses",
   method: "POST",
-  handler: httpAction(async () => jsonResponse(null)),
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    const params = {
+      oldStreet: body.old_street ?? "",
+      oldCity: body.old_city ?? "",
+      oldState: body.old_state ?? "",
+      oldZipCode: body.old_zip_code ?? "",
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "determine_addresses",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runDetermineAddresses, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
 });
 
 http.route({
@@ -480,6 +484,81 @@ http.route({
 
 http.route({
   path: "/recommended-furniture",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── POST /screenshots/upload ─────────────────────────────────────
+
+http.route({
+  path: "/screenshots/upload",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const { jobId, jobType, stepNumber, pageUrl, pageTitle, screenshotBase64 } = body;
+
+    if (!jobId || !screenshotBase64) {
+      return jsonResponse({ error: "jobId and screenshotBase64 are required" }, 400);
+    }
+
+    const binary = Uint8Array.from(atob(screenshotBase64), (c) =>
+      c.charCodeAt(0),
+    );
+    const blob = new Blob([binary], { type: "image/png" });
+    const storageId = await ctx.storage.store(blob);
+
+    await ctx.runMutation(api.mutations.insertScreenshot, {
+      jobId,
+      jobType: jobType ?? "",
+      stepNumber: stepNumber ?? 0,
+      pageUrl: pageUrl ?? "",
+      pageTitle: pageTitle ?? "",
+      storageId,
+    });
+
+    return jsonResponse({ ok: true, storageId });
+  }),
+});
+
+http.route({
+  path: "/screenshots/upload",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── GET /screenshots ────────────────────────────────────────────
+
+http.route({
+  path: "/screenshots",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const jobType = url.searchParams.get("job_type");
+    const jobId = url.searchParams.get("job_id");
+
+    if (jobId) {
+      const data = await ctx.runQuery(api.queries.listScreenshotsByJobId, {
+        jobId: jobId as any,
+      });
+      return jsonResponse(data);
+    }
+
+    if (jobType) {
+      const data = await ctx.runQuery(api.queries.listScreenshotsByJobType, {
+        jobType,
+      });
+      return jsonResponse(data);
+    }
+
+    return jsonResponse(
+      { error: "Provide ?job_type= or ?job_id= query parameter" },
+      400,
+    );
+  }),
+});
+
+http.route({
+  path: "/screenshots",
   method: "OPTIONS",
   handler: httpAction(async () => corsPreflightResponse()),
 });

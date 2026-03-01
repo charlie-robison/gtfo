@@ -13,6 +13,8 @@ Endpoints:
   POST /run-update-cashapp-address   — Run Cash App address update skill
   POST /run-update-southwest-address — Run Southwest address update skill
   POST /run-update-doordash-address  — Run DoorDash address update skill
+  POST /run-determine-addresses      — Scan Gmail for services with stored addresses
+  POST /run-cancel-lease             — Send lease cancellation email via AgentMail
 
 Run:
   cd server && uvicorn main:app --reload
@@ -23,7 +25,6 @@ import base64
 import json
 import os
 import sys
-import traceback
 from pathlib import Path
 
 import httpx
@@ -36,6 +37,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from server.utils import parse_redfin_results, parse_uhaul_result
+from server.agent_mail import AgentMailClient, GmailClient, UserAddress, classify_services, scan_emails
 
 CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
 
@@ -67,7 +69,7 @@ def _strip_markdown_fences(text: str) -> str:
     return text
 
 
-# ── Screenshot Loop ─────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────
 
 
 async def push_screenshot_to_convex(
@@ -107,11 +109,11 @@ def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
                 if page:
                     screenshot_b64 = await page.screenshot()
                     url = page.url if hasattr(page, "url") else ""
-                    title = (
-                        await page.title()
-                        if callable(getattr(page, "title", None))
-                        else ""
-                    )
+                    title = ""
+                    try:
+                        title = await page.title() if callable(getattr(page, "title", None)) else ""
+                    except Exception:
+                        pass
                     await push_screenshot_to_convex(
                         job_id=job_id,
                         job_type=job_type,
@@ -122,7 +124,7 @@ def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
                     )
                     step += 1
             except Exception:
-                pass
+                pass  # swallow errors so the agent doesn't crash
             await asyncio.sleep(interval)
 
     return _loop
@@ -136,6 +138,10 @@ async def run_search_rentals(params: dict):
     """Run the Redfin search skill and return parsed listings."""
     from server.skills.search_redfin_rentals import search_and_contact_redfin_rentals
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "search_rentals")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
         result = await search_and_contact_redfin_rentals(
             city=params["city"],
@@ -147,6 +153,7 @@ async def run_search_rentals(params: dict):
             min_bedrooms=params.get("minBedrooms", 1),
             min_bathrooms=params.get("minBathrooms", 1),
             max_results=params.get("maxResults", 5),
+            screenshot_loop=loop,
         )
 
         agent_output = str(result)
@@ -292,6 +299,10 @@ async def run_order_uhaul(params: dict):
     """Run the U-Haul ordering skill and return parsed result."""
     from server.skills.order_uhaul import order_uhaul
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "order_uhaul")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
         result = await order_uhaul(
             pickup_location=params["pickupLocation"],
@@ -301,10 +312,12 @@ async def run_order_uhaul(params: dict):
             vehicle_type=params.get("vehicleType", "truck"),
             num_workers=params.get("numWorkers", 0),
             loading_address=params.get("loadingAddress", ""),
+            screenshot_loop=loop,
         )
 
         agent_output = str(result)
-        return parse_uhaul_result(agent_output)
+        parsed = parse_uhaul_result(agent_output)
+        return parsed
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
@@ -316,17 +329,18 @@ async def run_update_address(params: dict):
     from server.skills.update_amazon_address import update_amazon_address
 
     job_id = params.get("jobId", "")
-    screenshot_loop = make_screenshot_loop(job_id, "update_address") if job_id else None
+    job_type = params.get("jobType", "update_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
-        await update_amazon_address(
+        result = await update_amazon_address(
             full_name=params["fullName"],
             street_address=params["streetAddress"],
             city=params["city"],
             state=params["state"],
             zip_code=params["zipCode"],
             phone=params.get("phone", ""),
-            screenshot_loop=screenshot_loop,
+            screenshot_loop=loop,
         )
         return {"message": "Updated all addresses to new address!"}
 
@@ -339,8 +353,15 @@ async def run_order_furniture(params: dict):
     """Run the Amazon furniture cart skill."""
     from server.skills.amazon_furniture_cart import amazon_furniture_cart
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "order_furniture")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
-        result = await amazon_furniture_cart(furniture_items=params["items"])
+        result = await amazon_furniture_cart(
+            furniture_items=params["items"],
+            screenshot_loop=loop,
+        )
         return {"summary": str(result)}
 
     except Exception as e:
@@ -353,7 +374,8 @@ async def run_update_cashapp_address(params: dict):
     from server.skills.update_cashapp_address import update_cashapp_address
 
     job_id = params.get("jobId", "")
-    screenshot_loop = make_screenshot_loop(job_id, "update_cashapp_address") if job_id else None
+    job_type = params.get("jobType", "update_cashapp_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
         await update_cashapp_address(
@@ -361,7 +383,7 @@ async def run_update_cashapp_address(params: dict):
             city=params["city"],
             state=params["state"],
             zip_code=params["zipCode"],
-            screenshot_loop=screenshot_loop,
+            screenshot_loop=loop,
         )
         return {"message": "Updated Cash App address!"}
 
@@ -375,7 +397,8 @@ async def run_update_southwest_address(params: dict):
     from server.skills.update_southwest_address import update_southwest_address
 
     job_id = params.get("jobId", "")
-    screenshot_loop = make_screenshot_loop(job_id, "update_southwest_address") if job_id else None
+    job_type = params.get("jobType", "update_southwest_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
         await update_southwest_address(
@@ -383,7 +406,7 @@ async def run_update_southwest_address(params: dict):
             city=params["city"],
             state=params["state"],
             zip_code=params["zipCode"],
-            screenshot_loop=screenshot_loop,
+            screenshot_loop=loop,
         )
         return {"message": "Updated Southwest Airlines address!"}
 
@@ -397,7 +420,8 @@ async def run_update_doordash_address(params: dict):
     from server.skills.update_doordash_address import update_doordash_address
 
     job_id = params.get("jobId", "")
-    screenshot_loop = make_screenshot_loop(job_id, "update_doordash_address") if job_id else None
+    job_type = params.get("jobType", "update_doordash_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
         await update_doordash_address(
@@ -405,9 +429,73 @@ async def run_update_doordash_address(params: dict):
             city=params["city"],
             state=params["state"],
             zip_code=params["zipCode"],
-            screenshot_loop=screenshot_loop,
+            screenshot_loop=loop,
         )
         return {"message": "Updated DoorDash address!"}
 
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-determine-addresses")
+async def run_determine_addresses(params: dict):
+    """Scan Gmail for services that likely store the user's address, classify them."""
+    old_address = None
+    if params.get("oldStreet"):
+        old_address = UserAddress(
+            street=params["oldStreet"],
+            city=params.get("oldCity", ""),
+            state=params.get("oldState", ""),
+            zip_code=params.get("oldZipCode", ""),
+        )
+
+    try:
+        # Gmail client + scanning are synchronous — run in a thread
+        loop = asyncio.get_event_loop()
+        gmail = await loop.run_in_executor(None, GmailClient)
+        user_email = await loop.run_in_executor(None, gmail.get_profile)
+
+        raw_hits, total = await loop.run_in_executor(
+            None, lambda: scan_emails(gmail, old_address=old_address)
+        )
+
+        if not raw_hits:
+            return {"services": [], "userEmail": user_email, "totalScanned": total}
+
+        services = await loop.run_in_executor(None, classify_services, raw_hits)
+
+        return {
+            "services": [svc.model_dump(mode="json") for svc in services],
+            "userEmail": user_email,
+            "totalScanned": total,
+        }
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}", "services": []}
+
+
+@app.post("/run-cancel-lease")
+async def run_cancel_lease(params: dict):
+    """Send a lease cancellation email via AgentMail."""
+    try:
+        loop = asyncio.get_event_loop()
+
+        def _send():
+            client = AgentMailClient()
+            client.send_lease_cancellation(
+                to_email=params["landlordEmail"],
+                tenant_name=params["tenantName"],
+                current_address=params["currentAddress"],
+                lease_end_date=params["leaseEndDate"],
+                move_out_date=params["moveOutDate"],
+                reason=params.get("reason", "I am relocating."),
+            )
+            return client.get_or_create_inbox()
+
+        inbox = await loop.run_in_executor(None, _send)
+
+        return {
+            "message": f"Lease cancellation sent to {params['landlordEmail']}",
+            "sentFrom": inbox,
+        }
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}

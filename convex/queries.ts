@@ -63,3 +63,35 @@ export const listAmazonOrderSummary = query({
     return await ctx.db.query("amazon_order_summary").collect();
   },
 });
+
+export const listScreenshotsByJobType = query({
+  args: { jobType: v.string() },
+  handler: async (ctx, args) => {
+    const docs = await ctx.db
+      .query("screenshots")
+      .withIndex("by_job_type", (q) => q.eq("jobType", args.jobType))
+      .collect();
+    return await Promise.all(
+      docs.map(async (doc) => ({
+        ...doc,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    );
+  },
+});
+
+export const listScreenshotsByJobId = query({
+  args: { jobId: v.id("jobs") },
+  handler: async (ctx, args) => {
+    const docs = await ctx.db
+      .query("screenshots")
+      .withIndex("by_job_id", (q) => q.eq("jobId", args.jobId))
+      .collect();
+    return await Promise.all(
+      docs.map(async (doc) => ({
+        ...doc,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    );
+  },
+});
