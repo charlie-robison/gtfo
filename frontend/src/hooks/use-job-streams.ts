@@ -28,7 +28,7 @@ export function useJobStreams() {
     try {
       const allJobs = await getJobs();
       const active = allJobs.filter(
-        (j) => j.status !== "completed" && j.status !== "failed"
+        (j) => j.status !== "completed" && j.status !== "failed" && j.status !== "cancelled"
       );
 
       activeJobIds.current = active.map((j) => j._id);

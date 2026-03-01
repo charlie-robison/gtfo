@@ -20,6 +20,15 @@ const fetchHeaders = {
   "ngrok-skip-browser-warning": "69420",
 };
 
+/** Check if a job has been cancelled; if so, return true so the handler can bail. */
+async function isJobCancelled(
+  ctx: { runQuery: (ref: any, args: any) => Promise<any> },
+  jobId: any,
+): Promise<boolean> {
+  const job = await ctx.runQuery(api.queries.getJob, { jobId });
+  return job?.status === "cancelled";
+}
+
 // ── Search Rentals ──────────────────────────────────────────────
 
 export const runSearchRentals = action({
@@ -231,6 +240,9 @@ export const runOrderUhaul = action({
 
       const uhaulData = await resp.json();
 
+      // Check if cancelled before persisting
+      if (await isJobCancelled(ctx, jobId)) return;
+
       await ctx.runMutation(api.mutations.insertUhaulInformation, {
         vehicle: uhaulData.vehicle ?? "",
         pickupLocation: uhaulData.pickupLocation ?? "",
@@ -281,6 +293,9 @@ export const runUpdateAddress = action({
 
       const result = await resp.json();
 
+      // Check if cancelled before persisting
+      if (await isJobCancelled(ctx, jobId)) return;
+
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,
         result: result.message ?? "Updated all addresses to new address!",
@@ -323,6 +338,9 @@ export const runOrderFurniture = action({
       if (result.error) {
         throw new Error(result.error);
       }
+
+      // Check if cancelled before persisting
+      if (await isJobCancelled(ctx, jobId)) return;
 
       await ctx.runMutation(api.mutations.insertAmazonOrderSummary, {
         summary: result.summary ?? "",
@@ -367,6 +385,9 @@ export const runUpdateCashappAddress = action({
 
       const result = await resp.json();
 
+      // Check if cancelled before persisting
+      if (await isJobCancelled(ctx, jobId)) return;
+
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,
         result: result.message ?? "Updated Cash App address!",
@@ -406,6 +427,9 @@ export const runUpdateSouthwestAddress = action({
 
       const result = await resp.json();
 
+      // Check if cancelled before persisting
+      if (await isJobCancelled(ctx, jobId)) return;
+
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,
         result: result.message ?? "Updated Southwest address!",
@@ -444,6 +468,9 @@ export const runUpdateDoordashAddress = action({
       }
 
       const result = await resp.json();
+
+      // Check if cancelled before persisting
+      if (await isJobCancelled(ctx, jobId)) return;
 
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,

@@ -6,10 +6,20 @@ import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { AgentCard } from "@/components/agents/agent-card";
 import { AgentOverlay } from "@/components/agents/agent-overlay";
 import { useJobStreams, type JobStream } from "@/hooks/use-job-streams";
+import { cancelJob } from "@/lib/endpoints";
 import { AgentSession } from "@/types";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OverrideDialog } from "@/components/dashboard/override-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 /** Map a Convex job status to the AgentSession status the UI expects. */
 function mapJobStatus(status: string): AgentSession["status"] {
@@ -22,6 +32,8 @@ function mapJobStatus(status: string): AgentSession["status"] {
       return "completed";
     case "failed":
       return "failed";
+    case "cancelled":
+      return "cancelled";
     default:
       return "running";
   }
@@ -39,6 +51,16 @@ const jobTypeLabels: Record<string, string> = {
   determine_addresses: "Address Scan",
   cancel_lease: "Lease Cancellation",
 };
+
+/** Job types that support cancellation. */
+const cancellableJobTypes = new Set([
+  "order_uhaul",
+  "update_amazon_address",
+  "order_furniture",
+  "update_cashapp_address",
+  "update_southwest_address",
+  "update_doordash_address",
+]);
 
 /** Build an AgentSession from a JobStream so existing card/overlay components work. */
 function toAgentSession(stream: JobStream): AgentSession {
@@ -59,6 +81,7 @@ export default function DashboardPage() {
   const { streams, loading, error } = useJobStreams();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{ jobId: string; label: string } | null>(null);
 
   // Sort: running first, then pending/initializing
   const sorted = useMemo(() => {
@@ -67,6 +90,19 @@ export default function DashboardPage() {
       (a, b) => order.indexOf(a.job.status) - order.indexOf(b.job.status)
     );
   }, [streams]);
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    try {
+      await cancelJob(cancelTarget.jobId);
+      toast.success(`Cancelled ${cancelTarget.label}`);
+    } catch (e) {
+      toast.error("Failed to cancel job");
+      console.error("Failed to cancel job:", e);
+    } finally {
+      setCancelTarget(null);
+    }
+  };
 
   const selectedStream = sorted.find((s) => s.job._id === selectedJobId) ?? null;
 
@@ -110,6 +146,7 @@ export default function DashboardPage() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 auto-rows-[minmax(200px,1fr)]" dir="ltr">
               {sorted.map((stream) => {
                 const agent = toAgentSession(stream);
+                const isCancellable = cancellableJobTypes.has(stream.job.type);
                 return (
                   <AgentCard
                     key={stream.job._id}
@@ -117,6 +154,7 @@ export default function DashboardPage() {
                     compact
                     screenshotUrl={stream.latestScreenshot?.url}
                     onClick={() => setSelectedJobId(stream.job._id)}
+                    onCancel={isCancellable ? () => setCancelTarget({ jobId: stream.job._id, label: agent.targetSite }) : undefined}
                   />
                 );
               })}
@@ -131,12 +169,37 @@ export default function DashboardPage() {
       </div>
 
       {/* Agent detail overlay */}
-      {selectedStream && (
-        <AgentOverlay
-          agent={toAgentSession(selectedStream)}
-          onClose={() => setSelectedJobId(null)}
-        />
-      )}
+      {selectedStream && (() => {
+        const overlayAgent = toAgentSession(selectedStream);
+        const isCancellable = cancellableJobTypes.has(selectedStream.job.type);
+        return (
+          <AgentOverlay
+            agent={overlayAgent}
+            onClose={() => setSelectedJobId(null)}
+            onCancel={isCancellable ? () => setCancelTarget({ jobId: selectedStream.job._id, label: overlayAgent.targetSite }) : undefined}
+          />
+        );
+      })()}
+
+      {/* Cancel confirmation dialog */}
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) setCancelTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel {cancelTarget?.label}?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this job? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>
+              Keep Running
+            </Button>
+            <Button variant="destructive" onClick={confirmCancel}>
+              Cancel Job
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

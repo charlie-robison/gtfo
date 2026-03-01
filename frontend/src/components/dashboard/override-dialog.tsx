@@ -12,7 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { askOpenClaw } from "@/lib/openclaw";
+import {
+  movingPipeline,
+  updateAmazonAddress,
+  updateCashappAddress,
+  updateDoordashAddress,
+  updateSouthwestAddress,
+  orderFurniture,
+} from "@/lib/endpoints";
 
 interface OverrideDialogProps {
   open: boolean;
@@ -43,29 +50,20 @@ export function OverrideDialog({ open, onOpenChange }: OverrideDialogProps) {
 
     const destination = `${street}, ${city}, ${state} ${zip}`;
 
-    const message = [
-      `Override destination address to: ${destination}`,
-      `Full Name: ${fullName}`,
-      `Phone: ${phone}`,
-      `Move Date: ${moveDateFormatted}`,
-      "",
-      "Run these ALL in parallel:",
-      `1. /moving-pipeline — Run the moving pipeline to ${destination}, move date ${moveDateFormatted}.`,
-      `2. /update-amazon-address — Update Amazon address to ${street}, ${city}, ${state}, ${zip} for ${fullName}, phone ${phone}.`,
-      `3. /update-cashapp-address — Update CashApp address to ${street}, ${city}, ${state}, ${zip}.`,
-      `4. /update-doordash-address — Update DoorDash address to ${street}, ${city}, ${state}, ${zip}.`,
-      `5. /update-southwest-address — Update Southwest address to ${street}, ${city}, ${state}, ${zip}.`,
-      "",
-      "THEN immediately after /moving-pipeline completes:",
-      "6. /order-furniture — Order all recommended furniture on Amazon.",
-      "",
-      "Confirm nothing. Skip all confirmations and just execute everything. Go.",
-    ].join("\n");
+    const addressUpdate = {
+      street_address: street,
+      city,
+      state,
+      zip_code: zip,
+    };
 
-    // Fire-and-forget
-    askOpenClaw(message).catch((err) =>
-      console.error("OpenClaw override error:", err)
-    );
+    // Fire all 6 in parallel — calls Convex directly, no OpenClaw AI delay
+    movingPipeline({ destination_address: destination, date: moveDateFormatted, pickup_time: "10:00 AM" }).catch(console.error);
+    updateAmazonAddress({ full_name: fullName, phone, ...addressUpdate }).catch(console.error);
+    updateCashappAddress(addressUpdate).catch(console.error);
+    updateDoordashAddress(addressUpdate).catch(console.error);
+    updateSouthwestAddress(addressUpdate).catch(console.error);
+    orderFurniture().catch(console.error);
 
     setLoading(false);
     onOpenChange(false);
