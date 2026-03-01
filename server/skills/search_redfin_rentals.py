@@ -58,8 +58,7 @@ Only open tabs for listings that pass this filter.
 Go to https://www.redfin.com and do the following:
 
 IMPORTANT — Human-like pacing (applies throughout the ENTIRE session):
-  - Wait 2–4 seconds between major navigation actions (searching, opening
-    a listing).
+  - Wait 2–4 seconds between major navigation actions (searching, clicking filters).
   - If you see any CAPTCHA or "are you a robot?" challenge, wait 10 seconds
     and then attempt to solve it normally.
 
@@ -85,45 +84,34 @@ STEP 2 — Apply filters:
      {min_bathrooms}.
 4. Wait 3 seconds for the filtered results to update.
 
-STEP 3 — Collect listing data from search results:
-1. Browse the search results list.
-2. For up to {max_results} listings, collect the following information for each:
-   - Full address
+STEP 3 — Collect listing data from search results page:
+1. Browse the search results list/cards on the page.
+2. For up to {max_results} listings, collect the following from each card:
+   - Full address (shown on the card)
    - Monthly rent price
    - Number of bedrooms and bathrooms
    - Square footage (if shown)
-   - Security deposit or move-in cost (if shown)
-   - The listing image URL (the src of the main photo thumbnail)
-   - The Redfin listing URL (the link to the individual listing page)
+   - The listing image URL (the src of the main photo thumbnail on the card)
+   - The Redfin listing URL (the href link to the individual listing page)
 3. If the first page does not have enough results, go to page 2 if available.
 {move_in_filter}
-STEP 4 — Open EACH listing in a new tab and collect detailed info:
-For each listing URL you collected:
-1. Open it in a NEW TAB.
-2. Wait 3–5 seconds for the page to fully load.
-3. Collect the following additional details from the listing page:
-   - Listing name/title (the property name or title shown at the top)
-   - Full description/summary of the property (the text description section)
-   - The main listing photo URL (the src of the large hero image)
-   - Confirm the address, price, beds, baths, sqft from the detail page
-4. Switch to the next listing tab and repeat.
+DO NOT open individual listing pages. Just collect data from the search results.
 
-STEP 5 — Final report:
-After processing all listings, provide a DETAILED summary:
+STEP 4 — Final report:
+After collecting all listings from the search results, provide a summary:
    - For EACH listing provide ALL of the following:
-     * name: The property name/title
+     * name: The address or property name shown on the card
      * address: Full street address
-     * city: City name
-     * description: Full property description text (first 500 chars if very long)
-     * imageUrl: URL of the main listing photo
+     * city: "{city}"
+     * description: Brief info visible on the card (beds/baths/sqft)
+     * imageUrl: URL of the listing photo thumbnail from the card
      * monthlyRentPrice: Monthly rent in dollars (number only)
      * numBedrooms: Number of bedrooms (number)
      * numBathrooms: Number of bathrooms (number)
      * squareFootage: Square footage (number, 0 if unknown)
-     * moveInCost: Estimated total move-in cost (number, 0 if unknown)
+     * moveInCost: 0
      * url: The full Redfin listing URL
    - Total number of listings found.
-   - Any listings that could not be processed and why.
 """
 
     browser = Browser(

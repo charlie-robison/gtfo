@@ -46,15 +46,10 @@ http.route({
       initialAddress: body.initial_address ?? "",
     });
 
-    // Write steps to Convex
+    // Write step to Convex
     await ctx.runMutation(api.mutations.insertStep, {
       stepNum: 0,
       stepName: "Search Listings",
-      currentCost: 0,
-    });
-    await ctx.runMutation(api.mutations.insertStep, {
-      stepNum: 1,
-      stepName: "Apply to Listings",
       currentCost: 0,
     });
 
@@ -76,7 +71,7 @@ http.route({
       params,
     });
 
-    // Schedule background action (search → save → apply to each)
+    // Schedule background action (search → save listings to DB)
     await ctx.scheduler.runAfter(0, api.actions.runSearchRentals, { jobId, params });
 
     return jsonResponse({ job_id: jobId });
@@ -85,6 +80,48 @@ http.route({
 
 http.route({
   path: "/search-rentals",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── POST /apply-to-listings ─────────────────────────────────────
+
+http.route({
+  path: "/apply-to-listings",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    // Get user info from request body or fall back to latest search constraints
+    let fullName = body.full_name ?? "";
+    let phone = body.phone ?? "";
+    let moveInDate = body.move_in_date ?? "";
+
+    if (!fullName || !phone || !moveInDate) {
+      const constraints = await ctx.runMutation(api.mutations.getLatestSearchConstraints, {});
+      if (constraints) {
+        fullName = fullName || constraints.fullName;
+        phone = phone || constraints.phone;
+        moveInDate = moveInDate || constraints.moveInDate;
+      }
+    }
+
+    const params = { fullName, phone, moveInDate };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "apply_to_listings",
+      params,
+    });
+
+    // Schedule background action to create apply jobs for each found listing
+    await ctx.scheduler.runAfter(0, api.actions.runApplyToListings, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
+});
+
+http.route({
+  path: "/apply-to-listings",
   method: "OPTIONS",
   handler: httpAction(async () => corsPreflightResponse()),
 });

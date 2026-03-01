@@ -71,6 +71,14 @@ export const listDetectedServices = query({
   },
 });
 
+export const listFoundRedfinApplications = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("redfin_applications").collect();
+    return all.filter((app) => app.applicationStatus === "found");
+  },
+});
+
 export const listScreenshotsByJobType = query({
   args: { jobType: v.string() },
   handler: async (ctx, args) => {

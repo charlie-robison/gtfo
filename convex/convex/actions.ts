@@ -47,9 +47,9 @@ export const runSearchRentals = action({
       const result = await resp.json();
       const listings = result.listings ?? [];
 
-      // Save each listing as a redfin_application with full details
+      // Save each listing as a redfin_application with status "found"
       for (const listing of listings) {
-        const applicationId = await ctx.runMutation(api.mutations.insertRedfinApplication, {
+        await ctx.runMutation(api.mutations.insertRedfinApplication, {
           name: listing.name ?? "",
           address: listing.address ?? "",
           city: listing.city ?? params.city ?? "",
@@ -63,40 +63,79 @@ export const runSearchRentals = action({
           url: listing.url ?? "",
           applicationStatus: "found",
         });
-
-        // Create a separate apply job for each listing
-        if (listing.url) {
-          const applyParams = {
-            listingUrl: listing.url,
-            fullName: params.fullName,
-            phone: params.phone,
-            moveInDate: params.moveInDate,
-            applicationId,
-          };
-
-          const applyJobId = await ctx.runMutation(api.mutations.createJob, {
-            type: "apply_redfin",
-            params: applyParams,
-          });
-
-          // Link the apply job to the application
-          await ctx.runMutation(api.mutations.updateRedfinApplicationStatus, {
-            applicationId,
-            applicationStatus: "applying",
-            applyJobId: applyJobId,
-          });
-
-          // Schedule the apply action in background
-          await ctx.scheduler.runAfter(0, api.actions.runApplyRedfin, {
-            jobId: applyJobId,
-            params: applyParams,
-          });
-        }
       }
 
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,
         result: { listingsCount: listings.length },
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
+// ── Apply to All Found Listings (in parallel) ──────────────────
+
+export const runApplyToListings = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      // Get all listings with status "found"
+      const foundListings = await ctx.runQuery(api.queries.listFoundRedfinApplications);
+
+      if (foundListings.length === 0) {
+        await ctx.runMutation(api.mutations.completeJob, {
+          jobId,
+          result: { message: "No found listings to apply to." },
+        });
+        return;
+      }
+
+      // Create and schedule an apply job for each listing in parallel
+      for (const listing of foundListings) {
+        if (!listing.url) continue;
+
+        const applyParams = {
+          listingUrl: listing.url,
+          fullName: params.fullName,
+          phone: params.phone,
+          moveInDate: params.moveInDate,
+          applicationId: listing._id,
+        };
+
+        const applyJobId = await ctx.runMutation(api.mutations.createJob, {
+          type: "apply_redfin",
+          params: applyParams,
+        });
+
+        // Link the apply job to the application and mark as "applying"
+        await ctx.runMutation(api.mutations.updateRedfinApplicationStatus, {
+          applicationId: listing._id,
+          applicationStatus: "applying",
+          applyJobId: applyJobId,
+        });
+
+        // Schedule the apply action in background (all run in parallel)
+        await ctx.scheduler.runAfter(0, api.actions.runApplyRedfin, {
+          jobId: applyJobId,
+          params: applyParams,
+        });
+      }
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: { listingsCount: foundListings.length },
       });
     } catch (e: any) {
       await ctx.runMutation(api.mutations.failJob, {
