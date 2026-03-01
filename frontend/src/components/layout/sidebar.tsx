@@ -23,7 +23,7 @@ import {
   SheetTrigger,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { mockPipelineState } from "@/data/mock-activity";
+import { usePipelineProgress } from "@/hooks/use-pipeline-progress";
 import { useState } from "react";
 
 const navItems = [
@@ -35,13 +35,15 @@ const navItems = [
 ];
 
 function PhaseIndicator() {
+  const phases = usePipelineProgress();
+
   return (
     <div className="px-4 py-3">
       <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
         Pipeline Progress
       </p>
       <div className="space-y-2.5">
-        {mockPipelineState.phases.map((phase) => (
+        {phases.map((phase) => (
           <div key={phase.phase} className="flex items-center gap-2.5">
             <div
               className={cn(
@@ -81,7 +83,7 @@ function PhaseIndicator() {
               <div className="h-1 rounded-full bg-muted overflow-hidden">
                 <div
                   className={cn(
-                    "h-full rounded-full transition-all",
+                    "h-full rounded-full transition-all duration-500",
                     phase.status === "completed" && "bg-green-500",
                     phase.status === "active" && "bg-emerald-500"
                   )}

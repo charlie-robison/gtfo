@@ -1,13 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { mockPipelineState } from "@/data/mock-activity";
+import { usePipelineProgress } from "@/hooks/use-pipeline-progress";
 import { Check, Loader2 } from "lucide-react";
 
 export function PipelineBar() {
+  const phases = usePipelineProgress();
+
   return (
     <div className="flex items-center gap-1 w-full">
-      {mockPipelineState.phases.map((phase, i) => (
+      {phases.map((phase, i) => (
         <div key={phase.phase} className="flex-1 flex items-center gap-1">
           <div className="flex-1">
             <div className="flex items-center justify-between mb-1">
@@ -38,7 +40,7 @@ export function PipelineBar() {
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
                 className={cn(
-                  "h-full rounded-full transition-all",
+                  "h-full rounded-full transition-all duration-500",
                   phase.status === "completed" && "bg-green-500",
                   phase.status === "active" && "bg-emerald-500",
                   phase.status === "pending" && "bg-transparent",
@@ -47,7 +49,7 @@ export function PipelineBar() {
               />
             </div>
           </div>
-          {i < mockPipelineState.phases.length - 1 && (
+          {i < phases.length - 1 && (
             <div className={cn(
               "w-2 h-0.5 shrink-0 mt-3",
               phase.status === "completed" ? "bg-green-500/50" : "bg-muted"
