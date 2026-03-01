@@ -77,9 +77,14 @@ Otherwise: click "Sign In", enter x_uhaul_email and x_uhaul_pass.
 If OTP is required: switch to Tab 2 (Gmail), sign in with x_uhaul_email / x_uhaul_pass if needed, find the latest U-Haul email, copy the 6-digit code, switch back to Tab 1, enter the code and submit.
 
 STEP 2 — Start a reservation:
-On the homepage, fill the reservation form: One-Way (pickup/dropoff differ) or In-Town.
-Picking Up: {pickup_location} | Dropping Off: {dropoff_location} | Date: {pickup_date} | Time: {pickup_time}
-Click "Get Rates" / "Search".
+1. On the homepage (or navigate back to it), find the reservation / quote form.
+2. Select the moving type. Choose "One-Way" if the pickup and drop-off locations are different, otherwise choose "In-Town".
+3. Fill in the form fields. IMPORTANT: Each field may already contain a pre-filled address from the account. You MUST fully clear it before typing the new value. Never leave old text in the field.
+   - Picking Up: Click the field. Triple-click to select all text, then press Backspace/Delete to remove it. Verify the field is completely empty. Then type {pickup_location}. Wait for the autocomplete dropdown and select the matching suggestion.
+   - Dropping Off: Click the field. Triple-click to select all text, then press Backspace/Delete to remove it. Verify the field is completely empty. Then type {dropoff_location}. Wait for the autocomplete dropdown and select the matching suggestion.
+   - Pick-Up Date: Clear any pre-filled date first, then enter {pickup_date}.
+   - Pick-Up Time: Clear any pre-filled time first, then enter {pickup_time}.
+4. Click "Get Rates" or the equivalent search / submit button.
 
 STEP 3 — Choose a vehicle:
 Select the cheapest {vehicle_type} and click "Reserve" / "Select".
