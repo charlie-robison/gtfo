@@ -25,7 +25,8 @@ function classifyLog(text: string): ActivityEvent["type"] {
     lower.includes("success") ||
     lower.includes("updated") ||
     lower.includes("accepted") ||
-    lower.includes("confirmed")
+    lower.includes("confirmed") ||
+    lower.includes("found")
   )
     return "success";
   return "info";
@@ -39,8 +40,7 @@ function parseLogLines(
   for (const block of output) {
     if (block.content) {
       for (const part of block.content) {
-        if (part.type === "text" && part.text) {
-          // Split on newlines so each line becomes its own log entry
+        if ((part.type === "text" || part.type === "output_text") && part.text) {
           for (const line of part.text.split("\n")) {
             const trimmed = line.trim();
             if (trimmed.length > 0) lines.push(trimmed);
@@ -52,7 +52,7 @@ function parseLogLines(
   return lines;
 }
 
-const POLL_INTERVAL = 2000; // 2 seconds
+const POLL_INTERVAL = 7_000;
 
 export function useOpenClawLogs() {
   const [logs, setLogs] = useState<ActivityEvent[]>([]);
@@ -62,12 +62,13 @@ export function useOpenClawLogs() {
   const isFetchingRef = useRef(false);
 
   const fetchLogs = useCallback(async () => {
-    // Skip if a request is already in-flight
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
     try {
-      const response = await askOpenClaw("Show me recent logs");
+      const response = await askOpenClaw(
+        "What's the status of all my moving jobs?"
+      );
 
       const lines = parseLogLines(response.output ?? []);
 
@@ -89,6 +90,7 @@ export function useOpenClawLogs() {
 
       setError(null);
     } catch (err) {
+      // Only show error if we have no existing data
       setError(err instanceof Error ? err.message : "Failed to fetch logs");
     } finally {
       setIsLoading(false);
