@@ -7,6 +7,7 @@ import {
   Building2,
   MapPin,
   Truck,
+  ShoppingCart,
   Menu,
   Check,
   Circle,
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/dashboard/apartments", label: "Apartments", icon: Building2 },
   { href: "/dashboard/addresses", label: "Addresses", icon: MapPin },
   { href: "/dashboard/movers", label: "Movers", icon: Truck },
+  { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
 ];
 
 function PhaseIndicator() {

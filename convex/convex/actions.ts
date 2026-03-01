@@ -50,11 +50,11 @@ export const runSearchRentals = action({
       for (const listing of listings) {
         await ctx.runMutation(api.mutations.insertRedfinApplication, {
           address: listing.address ?? "",
-          monthlyRentPrice: listing.monthlyRentPrice ?? 0,
-          numBedrooms: listing.numBedrooms ?? 0,
-          numBathrooms: listing.numBathrooms ?? 0,
-          squareFootage: listing.squareFootage ?? 0,
-          moveInCost: listing.moveInCost ?? 0,
+          monthlyRentPrice: listing.monthly_rent_price ?? listing.monthlyRentPrice ?? 0,
+          numBedrooms: listing.num_bedrooms ?? listing.numBedrooms ?? 0,
+          numBathrooms: listing.num_bathrooms ?? listing.numBathrooms ?? 0,
+          squareFootage: listing.square_footage ?? listing.squareFootage ?? 0,
+          moveInCost: listing.move_in_cost ?? listing.moveInCost ?? 0,
           url: listing.url ?? "",
         });
       }

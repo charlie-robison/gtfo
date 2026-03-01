@@ -175,6 +175,18 @@ export interface AmazonOrderSummary {
   summary: string;
 }
 
+export interface DetectedService {
+  _id: string;
+  serviceName: string;
+  category: string;
+  priority: string;
+  detectedFrom: string[];
+  emailCount: number;
+  settingsUrl?: string;
+  needsAddressUpdate: boolean;
+  sampleSender: string;
+}
+
 export interface Screenshot {
   _id: string;
   jobId: string;
@@ -258,6 +270,10 @@ export function getSearchConstraints() {
 
 export function getHouseInformation() {
   return get<HouseInformation[]>("/house-information");
+}
+
+export function getDetectedServices() {
+  return get<DetectedService[]>("/detected-services");
 }
 
 export function getRedfinApplications() {
