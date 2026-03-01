@@ -180,16 +180,3 @@ export const getLatestSearchConstraints = mutation({
   },
 });
 
-export const insertScreenshot = mutation({
-  args: {
-    jobId: v.string(),
-    jobType: v.string(),
-    stepNumber: v.number(),
-    pageUrl: v.string(),
-    pageTitle: v.string(),
-    storageId: v.id("_storage"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("screenshots", args);
-  },
-});

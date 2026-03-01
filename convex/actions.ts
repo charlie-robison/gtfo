@@ -122,7 +122,7 @@ export const runOrderUhaul = action({
   },
 });
 
-// ── Update Address ──────────────────────────────────────────────
+// ── Update Amazon Address ───────────────────────────────────────
 
 export const runUpdateAddress = action({
   args: {
@@ -135,10 +135,10 @@ export const runUpdateAddress = action({
     await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
 
     try {
-      const resp = await fetch(`${getFastapiUrl()}/run-update-address`, {
+      const resp = await fetch(`${getFastapiUrl()}/run-update-amazon-address`, {
         method: "POST",
         headers: fetchHeaders,
-        body: JSON.stringify({ ...params, jobId, jobType: "update_address" }),
+        body: JSON.stringify({ ...params, jobId, jobType: "update_amazon_address" }),
       });
 
       if (!resp.ok) {

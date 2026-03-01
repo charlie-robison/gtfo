@@ -103,7 +103,7 @@ Analyze house photo with GPT-4o, get furniture recommendations, and schedule U-H
 
 ---
 
-### POST /update-address
+### POST /update-amazon-address
 
 Update Amazon delivery address. Creates a background job.
 
@@ -240,6 +240,96 @@ Send a lease cancellation / notice to vacate email to the current landlord via A
 
 ---
 
+### POST /update-cashapp-address
+
+Update Cash App address. Creates a background job.
+
+**Input:**
+
+```json
+{
+  "street_address": "456 Oak Ave",
+  "city": "Sacramento",
+  "state": "CA",
+  "zip_code": "95814"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| street_address | string | yes | — | Street address |
+| city | string | yes | — | City |
+| state | string | yes | — | State |
+| zip_code | string | yes | — | ZIP code |
+
+**Output:**
+
+```json
+{ "job_id": "jd7..." }
+```
+
+---
+
+### POST /update-southwest-address
+
+Update Southwest Airlines address. Creates a background job.
+
+**Input:**
+
+```json
+{
+  "street_address": "456 Oak Ave",
+  "city": "Sacramento",
+  "state": "CA",
+  "zip_code": "95814"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| street_address | string | yes | — | Street address |
+| city | string | yes | — | City |
+| state | string | yes | — | State |
+| zip_code | string | yes | — | ZIP code |
+
+**Output:**
+
+```json
+{ "job_id": "jd7..." }
+```
+
+---
+
+### POST /update-doordash-address
+
+Update DoorDash address. Creates a background job.
+
+**Input:**
+
+```json
+{
+  "street_address": "456 Oak Ave",
+  "city": "Sacramento",
+  "state": "CA",
+  "zip_code": "95814"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| street_address | string | yes | — | Street address |
+| city | string | yes | — | City |
+| state | string | yes | — | State |
+| zip_code | string | yes | — | ZIP code |
+
+**Output:**
+
+```json
+{ "job_id": "jd7..." }
+```
+
+---
+
 ### POST /setup-utilities
 
 **Not yet implemented.** Returns `null`.
@@ -294,7 +384,7 @@ List all background jobs, or get one by ID.
 
 | Field | Type | Values |
 |-------|------|--------|
-| type | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` \| `determine_addresses` \| `cancel_lease` |
+| type | string | `search_rentals` \| `order_uhaul` \| `update_amazon_address` \| `order_furniture` \| `determine_addresses` \| `cancel_lease` \| `update_cashapp_address` \| `update_southwest_address` \| `update_doordash_address` |
 | status | string | `pending` \| `running` \| `completed` \| `failed` |
 
 ---
@@ -427,7 +517,7 @@ List screenshots captured during browser-use skill sessions. Filter by job type 
 | Field | Type | Description |
 |-------|------|-------------|
 | jobId | id | Reference to the job that produced this screenshot |
-| jobType | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` |
+| jobType | string | `search_rentals` \| `order_uhaul` \| `update_amazon_address` \| `order_furniture` \| `update_cashapp_address` \| `update_southwest_address` \| `update_doordash_address` |
 | stepNumber | number | Zero-indexed step in the agent's history |
 | pageUrl | string | URL the browser was on when the screenshot was taken |
 | pageTitle | string | Page title at the time of the screenshot |
@@ -454,10 +544,13 @@ List all Amazon order summaries from furniture ordering.
 |--------|-----|-------------|
 | POST | `/search-rentals` | Search & apply to Redfin rentals |
 | POST | `/moving-pipeline` | Analyze house + furniture recs + schedule U-Haul |
-| POST | `/update-address` | Update Amazon delivery address |
+| POST | `/update-amazon-address` | Update Amazon delivery address |
 | POST | `/order-furniture` | Order recommended furniture on Amazon |
 | POST | `/determine-addresses` | Scan Gmail for services with stored addresses |
 | POST | `/cancel-current-lease` | Send lease cancellation email to landlord |
+| POST | `/update-cashapp-address` | Update Cash App address |
+| POST | `/update-southwest-address` | Update Southwest Airlines address |
+| POST | `/update-doordash-address` | Update DoorDash address |
 | POST | `/setup-utilities` | Set up utilities (TODO) |
 | GET | `/jobs` | List all jobs or get one by `?job_id=` |
 | GET | `/steps` | List all pipeline steps |
@@ -502,7 +595,10 @@ Called by Convex actions only. Not for direct client use.
 | `POST /run-search-rentals` | Run Redfin browser agent, return parsed listings |
 | `POST /run-moving-analysis` | Run GPT-4o house analysis + furniture recs |
 | `POST /run-order-uhaul` | Run U-Haul browser agent, return parsed result |
-| `POST /run-update-address` | Run Amazon address update browser agent |
+| `POST /run-update-amazon-address` | Run Amazon address update browser agent |
 | `POST /run-order-furniture` | Run Amazon furniture cart browser agent |
+| `POST /run-update-cashapp-address` | Run Cash App address update browser agent |
+| `POST /run-update-southwest-address` | Run Southwest Airlines address update browser agent |
+| `POST /run-update-doordash-address` | Run DoorDash address update browser agent |
 | `POST /run-determine-addresses` | Scan Gmail, classify services with stored addresses |
 | `POST /run-cancel-lease` | Send lease cancellation email via AgentMail |

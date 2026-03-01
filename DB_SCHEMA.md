@@ -10,7 +10,7 @@ Tracks every background task dispatched to FastAPI. Each skill execution (rental
 
 | Field | Type | Description |
 |-------|------|-------------|
-| type | string | The kind of skill being run. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`, `determine_addresses`, `cancel_lease`. |
+| type | string | The kind of skill being run. One of: `search_rentals`, `order_uhaul`, `update_amazon_address`, `order_furniture`, `determine_addresses`, `cancel_lease`, `update_cashapp_address`, `update_southwest_address`, `update_doordash_address`. |
 | status | string | Current lifecycle state. One of: `pending` (created, not yet started), `running` (skill is executing), `completed` (finished successfully), `failed` (error occurred). |
 | params | any | The input parameters passed to the skill. Shape varies by job type. |
 | result | any? | The output returned by the skill on success. `undefined` while pending/running. Shape varies by job type. |
@@ -18,7 +18,7 @@ Tracks every background task dispatched to FastAPI. Each skill execution (rental
 | browserUseExternalId | string? | External session ID from the Browser Use API. Used to track/resume browser automation sessions. |
 | browserUseTaskId | string? | Internal task ID from the Browser Use component. Used for cleanup and status tracking. |
 
-**Written by:** `POST /search-rentals`, `POST /moving-pipeline`, `POST /update-address`, `POST /order-furniture`, `POST /cancel-current-lease`
+**Written by:** `POST /search-rentals`, `POST /moving-pipeline`, `POST /update-amazon-address`, `POST /order-furniture`, `POST /cancel-current-lease`, `POST /update-cashapp-address`, `POST /update-southwest-address`, `POST /update-doordash-address`
 
 **Read by:** `GET /jobs`, `GET /jobs?job_id=...`
 
@@ -184,7 +184,7 @@ Screenshots captured during browser-use skill sessions. Each row stores metadata
 | Field | Type | Description |
 |-------|------|-------------|
 | jobId | id (jobs) | Reference to the job that produced this screenshot. |
-| jobType | string | The kind of skill that was running. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`, `determine_addresses`, `cancel_lease`. |
+| jobType | string | The kind of skill that was running. One of: `search_rentals`, `order_uhaul`, `update_amazon_address`, `order_furniture`, `determine_addresses`, `cancel_lease`, `update_cashapp_address`, `update_southwest_address`, `update_doordash_address`. |
 | stepNumber | number | Zero-indexed step number in the agent's action history. |
 | pageUrl | string | The URL the browser was visiting when the screenshot was taken. |
 | pageTitle | string | The page title at the time the screenshot was taken. |
@@ -194,6 +194,6 @@ Screenshots captured during browser-use skill sessions. Each row stores metadata
 - `by_job_type` — on `jobType`. For listing all screenshots from a given skill type.
 - `by_job_id` — on `jobId`. For listing all screenshots from a specific job.
 
-**Written by:** Background actions after `POST /search-rentals`, `POST /moving-pipeline` (U-Haul sub-job), `POST /update-address`, `POST /order-furniture`
+**Written by:** Background actions after `POST /search-rentals`, `POST /moving-pipeline` (U-Haul sub-job), `POST /update-amazon-address`, `POST /update-cashapp-address`, `POST /update-southwest-address`, `POST /update-doordash-address`, `POST /order-furniture`
 
 **Read by:** `GET /screenshots?job_type=...`, `GET /screenshots?job_id=...`

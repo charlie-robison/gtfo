@@ -8,7 +8,7 @@ Endpoints:
   POST /run-search-rentals           — Run Redfin search skill, return parsed listings
   POST /run-moving-analysis          — Run GPT-4o house analysis + furniture recs
   POST /run-order-uhaul              — Run U-Haul ordering skill, return parsed result
-  POST /run-update-address           — Run Amazon address update skill
+  POST /run-update-amazon-address    — Run Amazon address update skill
   POST /run-order-furniture          — Run Amazon furniture cart skill
   POST /run-update-cashapp-address   — Run Cash App address update skill
   POST /run-update-southwest-address — Run Southwest address update skill
@@ -323,13 +323,13 @@ async def run_order_uhaul(params: dict):
         return {"error": f"{type(e).__name__}: {e}"}
 
 
-@app.post("/run-update-address")
-async def run_update_address(params: dict):
+@app.post("/run-update-amazon-address")
+async def run_update_amazon_address(params: dict):
     """Run the Amazon address update skill."""
     from server.skills.update_amazon_address import update_amazon_address
 
     job_id = params.get("jobId", "")
-    job_type = params.get("jobType", "update_address")
+    job_type = params.get("jobType", "update_amazon_address")
     loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:

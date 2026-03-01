@@ -114,10 +114,10 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /update-address ────────────────────────────────────────
+// ── POST /update-amazon-address ─────────────────────────────────
 
 http.route({
-  path: "/update-address",
+  path: "/update-amazon-address",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const body = await request.json();
@@ -132,7 +132,7 @@ http.route({
     };
 
     const jobId = await ctx.runMutation(api.mutations.createJob, {
-      type: "update_address",
+      type: "update_amazon_address",
       params,
     });
 
@@ -143,7 +143,7 @@ http.route({
 });
 
 http.route({
-  path: "/update-address",
+  path: "/update-amazon-address",
   method: "OPTIONS",
   handler: httpAction(async () => corsPreflightResponse()),
 });
