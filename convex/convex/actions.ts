@@ -335,6 +335,10 @@ export const runOrderFurniture = action({
 
       const result = await resp.json();
 
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
       // Check if cancelled before persisting
       if (await isJobCancelled(ctx, jobId)) return;
 
