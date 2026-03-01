@@ -1,15 +1,8 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import { api } from "./_generated/api";
 
 const http = httpRouter();
-
-function getFastapiUrl(): string {
-  const url = process.env.FASTAPI_URL;
-  if (!url) {
-    throw new Error("FASTAPI_URL environment variable is not set. Set it in the Convex dashboard.");
-  }
-  return url;
-}
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -26,55 +19,8 @@ function corsPreflightResponse(): Response {
   return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
-async function proxyPost(path: string, body: unknown): Promise<Response> {
-  const FASTAPI_URL = getFastapiUrl();
-  const resp = await fetch(`${FASTAPI_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "convex-backend",
-      "ngrok-skip-browser-warning": "69420",
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await resp.text();
-  try {
-    JSON.parse(text);
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Upstream returned non-JSON", body: text.slice(0, 500) }),
-      { status: 502, headers: corsHeaders() }
-    );
-  }
-  return new Response(text, {
-    status: resp.status,
-    headers: corsHeaders(),
-  });
-}
-
-async function proxyGet(path: string): Promise<Response> {
-  const FASTAPI_URL = getFastapiUrl();
-  const resp = await fetch(`${FASTAPI_URL}${path}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "convex-backend",
-      "ngrok-skip-browser-warning": "69420",
-    },
-  });
-  const text = await resp.text();
-  try {
-    JSON.parse(text);
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Upstream returned non-JSON", body: text.slice(0, 500) }),
-      { status: 502, headers: corsHeaders() }
-    );
-  }
-  return new Response(text, {
-    status: resp.status,
-    headers: corsHeaders(),
-  });
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), { status, headers: corsHeaders() });
 }
 
 // ── POST /search-rentals ────────────────────────────────────────
@@ -82,9 +28,53 @@ async function proxyGet(path: string): Promise<Response> {
 http.route({
   path: "/search-rentals",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const body = await request.json();
-    return proxyPost("/search-rentals", body);
+    const maxResults = 5;
+
+    // Write search constraints to Convex
+    await ctx.runMutation(api.mutations.insertSearchConstraints, {
+      budget: body.budget,
+      city: body.city,
+      state: body.state,
+      fullName: body.full_name,
+      phone: body.phone,
+      moveInDate: body.move_in_date,
+      minBedrooms: body.min_bedrooms ?? 1,
+      minBathrooms: body.min_bathrooms ?? 1,
+      maxResults,
+      initialAddress: body.initial_address ?? "",
+    });
+
+    // Write step to Convex
+    await ctx.runMutation(api.mutations.insertStep, {
+      stepNum: 0,
+      stepName: "Apply to Listings",
+      currentCost: 0,
+    });
+
+    // Create job in Convex
+    const params = {
+      city: body.city,
+      state: body.state,
+      maxRent: body.budget - 1000,
+      fullName: body.full_name,
+      phone: body.phone,
+      moveInDate: body.move_in_date,
+      minBedrooms: body.min_bedrooms ?? 1,
+      minBathrooms: body.min_bathrooms ?? 1,
+      maxResults,
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "search_rentals",
+      params,
+    });
+
+    // Schedule background action
+    await ctx.scheduler.runAfter(0, api.actions.runSearchRentals, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
   }),
 });
 
@@ -99,9 +89,22 @@ http.route({
 http.route({
   path: "/moving-pipeline",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const body = await request.json();
-    return proxyPost("/moving-pipeline", body);
+
+    // Get initial address from latest search constraints
+    const constraints = await ctx.runMutation(api.mutations.getLatestSearchConstraints, {});
+    const initialAddress = constraints?.initialAddress ?? "";
+
+    // Run the analysis action (calls FastAPI, writes to Convex)
+    const result = await ctx.runAction(api.actions.runMovingAnalysis, {
+      destinationAddress: body.destination_address,
+      date: body.date,
+      pickupTime: body.pickup_time ?? "10:00 AM",
+      initialAddress,
+    });
+
+    return jsonResponse(result);
   }),
 });
 
@@ -111,31 +114,31 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /cancel-current-lease ──────────────────────────────────
-
-http.route({
-  path: "/cancel-current-lease",
-  method: "POST",
-  handler: httpAction(async (_ctx, request) => {
-    const body = await request.json();
-    return proxyPost("/cancel-current-lease", body);
-  }),
-});
-
-http.route({
-  path: "/cancel-current-lease",
-  method: "OPTIONS",
-  handler: httpAction(async () => corsPreflightResponse()),
-});
-
 // ── POST /update-address ────────────────────────────────────────
 
 http.route({
   path: "/update-address",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const body = await request.json();
-    return proxyPost("/update-address", body);
+
+    const params = {
+      fullName: body.full_name,
+      streetAddress: body.street_address,
+      city: body.city,
+      state: body.state,
+      zipCode: body.zip_code,
+      phone: body.phone ?? "",
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "update_address",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runUpdateAddress, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
   }),
 });
 
@@ -150,8 +153,28 @@ http.route({
 http.route({
   path: "/order-furniture",
   method: "POST",
-  handler: httpAction(async () => {
-    return proxyPost("/order-furniture", {});
+  handler: httpAction(async (ctx) => {
+    // Read furniture from Convex DB
+    const furniture = await ctx.runQuery(api.queries.listRecommendedFurniture);
+    const searchQueries = furniture.map((f: any) => f.amazonSearchQuery);
+
+    if (searchQueries.length === 0) {
+      return jsonResponse(
+        { error: "No recommended furniture found. Run /moving-pipeline first." },
+        400,
+      );
+    }
+
+    const params = { items: searchQueries };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "order_furniture",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runOrderFurniture, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
   }),
 });
 
@@ -161,15 +184,26 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /determine-addresses ───────────────────────────────────
+// ── POST /cancel-current-lease (TODO) ───────────────────────────
+
+http.route({
+  path: "/cancel-current-lease",
+  method: "POST",
+  handler: httpAction(async () => jsonResponse(null)),
+});
+
+http.route({
+  path: "/cancel-current-lease",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── POST /determine-addresses (TODO) ────────────────────────────
 
 http.route({
   path: "/determine-addresses",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
-    const body = await request.json();
-    return proxyPost("/determine-addresses", body);
-  }),
+  handler: httpAction(async () => jsonResponse(null)),
 });
 
 http.route({
@@ -178,15 +212,12 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /setup-utilities ───────────────────────────────────────
+// ── POST /setup-utilities (TODO) ────────────────────────────────
 
 http.route({
   path: "/setup-utilities",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
-    const body = await request.json();
-    return proxyPost("/setup-utilities", body);
-  }),
+  handler: httpAction(async () => jsonResponse(null)),
 });
 
 http.route({
@@ -195,21 +226,23 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── GET /jobs/{job_id} ──────────────────────────────────────────
+// ── GET /jobs ───────────────────────────────────────────────────
 
 http.route({
   path: "/jobs",
   method: "GET",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const url = new URL(request.url);
     const jobId = url.searchParams.get("job_id");
-    if (!jobId) {
-      return new Response(
-        JSON.stringify({ error: "job_id query parameter is required" }),
-        { status: 400, headers: corsHeaders() }
-      );
+    if (jobId) {
+      const job = await ctx.runQuery(api.queries.getJob, { jobId: jobId as any });
+      if (!job) {
+        return jsonResponse({ error: "Job not found" }, 404);
+      }
+      return jsonResponse(job);
     }
-    return proxyGet(`/jobs/${encodeURIComponent(jobId)}`);
+    const jobs = await ctx.runQuery(api.queries.listJobs);
+    return jsonResponse(jobs);
   }),
 });
 
@@ -224,7 +257,10 @@ http.route({
 http.route({
   path: "/steps",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/steps")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listSteps);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
@@ -238,7 +274,10 @@ http.route({
 http.route({
   path: "/search-constraints",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/search-constraints")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listSearchConstraints);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
@@ -252,7 +291,10 @@ http.route({
 http.route({
   path: "/house-information",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/house-information")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listHouseInformation);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
@@ -266,7 +308,10 @@ http.route({
 http.route({
   path: "/redfin-applications",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/redfin-applications")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listRedfinApplications);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
@@ -280,7 +325,10 @@ http.route({
 http.route({
   path: "/uhaul-information",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/uhaul-information")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listUhaulInformation);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
@@ -294,7 +342,10 @@ http.route({
 http.route({
   path: "/recommended-furniture",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/recommended-furniture")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listRecommendedFurniture);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
@@ -308,7 +359,10 @@ http.route({
 http.route({
   path: "/amazon-order-summary",
   method: "GET",
-  handler: httpAction(async () => proxyGet("/amazon-order-summary")),
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listAmazonOrderSummary);
+    return jsonResponse(data);
+  }),
 });
 
 http.route({
