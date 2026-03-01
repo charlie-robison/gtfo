@@ -66,8 +66,8 @@ export const mockActivity: ActivityEvent[] = [
 export const mockPipelineState: PipelineState = {
   phases: [
     { phase: 1, name: "Find Apartment", progress: 100, status: "completed" },
-    { phase: 2, name: "Update Addresses", progress: 35, status: "active" },
-    { phase: 3, name: "Book Movers", progress: 0, status: "pending" },
+    { phase: 2, name: "Book Movers", progress: 35, status: "active" },
+    { phase: 3, name: "Update Addresses", progress: 0, status: "pending" },
   ],
   totalServicesDetected: 41,
   totalEmailsScanned: 3082,

@@ -7,7 +7,6 @@ import {
   Building2,
   MapPin,
   Truck,
-  Bot,
   Menu,
   Check,
   Circle,
@@ -31,7 +30,6 @@ const navItems = [
   { href: "/dashboard/apartments", label: "Apartments", icon: Building2 },
   { href: "/dashboard/addresses", label: "Addresses", icon: MapPin },
   { href: "/dashboard/movers", label: "Movers", icon: Truck },
-  { href: "/dashboard/agents", label: "Live Agents", icon: Bot },
 ];
 
 function PhaseIndicator() {
@@ -40,42 +38,56 @@ function PhaseIndicator() {
       <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
         Pipeline Progress
       </p>
-      <div className="flex items-center gap-2">
-        {mockPipelineState.phases.map((phase, i) => (
-          <div key={phase.phase} className="flex items-center gap-2">
+      <div className="space-y-2.5">
+        {mockPipelineState.phases.map((phase) => (
+          <div key={phase.phase} className="flex items-center gap-2.5">
             <div
               className={cn(
-                "flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold",
-                phase.status === "completed" &&
-                  "bg-green-500/20 text-green-400",
+                "flex items-center justify-center w-5 h-5 rounded-full shrink-0",
+                phase.status === "completed" && "bg-green-500/20 text-green-400",
                 phase.status === "active" && "bg-emerald-500/20 text-emerald-400",
                 phase.status === "pending" && "bg-muted text-muted-foreground"
               )}
             >
               {phase.status === "completed" ? (
-                <Check className="w-3.5 h-3.5" />
+                <Check className="w-3 h-3" />
               ) : phase.status === "active" ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                <Circle className="w-3 h-3" />
+                <Circle className="w-2.5 h-2.5" />
               )}
             </div>
-            {i < mockPipelineState.phases.length - 1 && (
-              <div
-                className={cn(
-                  "w-4 h-0.5",
-                  phase.status === "completed" ? "bg-green-500/50" : "bg-muted"
-                )}
-              />
-            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className={cn(
+                  "text-xs font-medium truncate",
+                  phase.status === "completed" && "text-green-400",
+                  phase.status === "active" && "text-emerald-400",
+                  phase.status === "pending" && "text-muted-foreground"
+                )}>
+                  {phase.name}
+                </span>
+                <span className={cn(
+                  "text-[10px] font-mono ml-2",
+                  phase.status === "completed" && "text-green-400",
+                  phase.status === "active" && "text-emerald-400",
+                  phase.status === "pending" && "text-muted-foreground"
+                )}>
+                  {phase.progress}%
+                </span>
+              </div>
+              <div className="h-1 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    phase.status === "completed" && "bg-green-500",
+                    phase.status === "active" && "bg-emerald-500"
+                  )}
+                  style={{ width: `${phase.progress}%` }}
+                />
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-1">
-        {mockPipelineState.phases.map((phase) => (
-          <p key={phase.phase} className="text-[10px] text-muted-foreground flex-1 text-center">
-            {phase.name}
-          </p>
         ))}
       </div>
     </div>
@@ -116,11 +128,6 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
             >
               <item.icon className="w-4 h-4" />
               {item.label}
-              {item.label === "Live Agents" && (
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-400">
-                  3
-                </span>
-              )}
             </Link>
           );
         })}
@@ -133,7 +140,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex w-60 border-r bg-card flex-col h-screen sticky top-0">
+    <aside className="hidden md:flex w-60 border-r bg-card flex-col h-screen sticky top-0 overflow-hidden">
       <NavContent />
     </aside>
   );

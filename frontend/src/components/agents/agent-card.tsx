@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AgentSession, AgentStatus } from "@/types";
 import { AgentScreenshot } from "./agent-screenshot";
 import { cn } from "@/lib/utils";
-import { Check, Clock, Loader2, AlertTriangle, XCircle } from "lucide-react";
+import { Check, Loader2, AlertTriangle, XCircle } from "lucide-react";
 
 const statusConfig: Record<
   AgentStatus,
@@ -46,20 +46,39 @@ const siteUrls: Record<string, string> = {
   "Venmo": "https://venmo.com/account/settings",
   "Tesla": "https://tesla.com/account/profile",
   "Amazon": "https://amazon.com/addresses",
+  "Chase": "https://chase.com/personal/profile",
+  "Wells Fargo": "https://wellsfargo.com/myaccount/address",
+  "Fidelity": "https://fidelity.com/account/profile",
+  "Netflix": "https://netflix.com/account/billing",
+  "Spotify": "https://spotify.com/account/profile",
+  "Citi": "https://online.citi.com/profile/settings",
+  "Progressive": "https://progressive.com/myaccount/policy",
+  "USPS": "https://moversguide.usps.com/mgo",
+  "DMV": "https://dmv.ca.gov/online/address-change",
+  "Kaiser Permanente": "https://healthy.kaiserpermanente.org/profile",
+  "State Farm": "https://statefarm.com/account/profile",
+  "Verizon": "https://verizon.com/myaccount/profile",
+  "Comcast": "https://xfinity.com/myaccount/settings",
+  "PG&E": "https://pge.com/myaccount/service",
+  "American Express": "https://americanexpress.com/account/settings",
+  "DoorDash": "https://doordash.com/consumer/account",
+  "Uber": "https://riders.uber.com/settings",
+  "Target": "https://target.com/account/addresses",
+  "Walmart": "https://walmart.com/account/addresses",
+  "Apple": "https://appleid.apple.com/account/manage",
+  "Google": "https://myaccount.google.com/address",
+  "PayPal": "https://paypal.com/myaccount/settings/address",
+  "Schwab": "https://schwab.com/client-home/profile",
+  "IRS": "https://irs.gov/forms/form-8822",
 };
-
-function formatElapsed(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
 
 interface AgentCardProps {
   agent: AgentSession;
   compact?: boolean;
+  onClick?: () => void;
 }
 
-export function AgentCard({ agent, compact }: AgentCardProps) {
+export function AgentCard({ agent, compact, onClick }: AgentCardProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
 
@@ -69,19 +88,16 @@ export function AgentCard({ agent, compact }: AgentCardProps) {
     return (
       <Card
         className={cn(
-          "flex flex-col h-full py-0 gap-0",
+          "flex flex-col h-full py-0 gap-0 cursor-pointer transition-colors hover:border-emerald-500/40",
           agent.status === "waiting_approval" && "border-amber-500/30"
         )}
+        onClick={onClick}
       >
         <CardContent className="p-1.5 flex flex-col gap-1 flex-1 min-h-0">
-          {/* Header: name + step + status + time — single row */}
+          {/* Header row */}
           <div className="flex items-center gap-1.5 px-1 shrink-0">
-            <h3 className="text-[11px] font-semibold whitespace-nowrap">{agent.targetSite}</h3>
+            <h3 className="text-[11px] font-semibold truncate">{agent.targetSite}</h3>
             <span className="text-[10px] text-muted-foreground truncate flex-1">{agent.currentStep}</span>
-            <span className="text-[9px] text-muted-foreground flex items-center gap-0.5 shrink-0">
-              <Clock className="w-2.5 h-2.5" />
-              {formatElapsed(agent.elapsedSeconds)}
-            </span>
             <Badge
               variant="outline"
               className={cn("text-[9px] gap-0.5 px-1 py-0 shrink-0", status.className)}
@@ -140,18 +156,14 @@ export function AgentCard({ agent, compact }: AgentCardProps) {
           url={siteUrls[agent.targetSite] || `https://${agent.targetSite.toLowerCase().replace(/\s+/g, "")}.com`}
           status={agent.status}
         />
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            {formatElapsed(agent.elapsedSeconds)}
-          </div>
-          {agent.status === "waiting_approval" && (
+        {agent.status === "waiting_approval" && (
+          <div className="flex justify-end">
             <Button size="sm" className="h-7 text-xs bg-amber-600 hover:bg-amber-700 gap-1">
               <Check className="w-3 h-3" />
               Approve
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
