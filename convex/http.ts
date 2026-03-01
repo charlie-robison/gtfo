@@ -354,6 +354,43 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
+// ── GET /screenshots ────────────────────────────────────────────
+
+http.route({
+  path: "/screenshots",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const jobType = url.searchParams.get("job_type");
+    const jobId = url.searchParams.get("job_id");
+
+    if (jobId) {
+      const data = await ctx.runQuery(api.queries.listScreenshotsByJobId, {
+        jobId: jobId as any,
+      });
+      return jsonResponse(data);
+    }
+
+    if (jobType) {
+      const data = await ctx.runQuery(api.queries.listScreenshotsByJobType, {
+        jobType,
+      });
+      return jsonResponse(data);
+    }
+
+    return jsonResponse(
+      { error: "Provide ?job_type= or ?job_id= query parameter" },
+      400,
+    );
+  }),
+});
+
+http.route({
+  path: "/screenshots",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
 // ── GET /amazon-order-summary ───────────────────────────────────
 
 http.route({

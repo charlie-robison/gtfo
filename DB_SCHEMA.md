@@ -153,3 +153,26 @@ Summary of the Amazon cart after the furniture ordering browser agent runs. Cont
 **Written by:** Background action after `POST /order-furniture` completes
 
 **Read by:** `GET /amazon-order-summary`
+
+---
+
+## screenshots
+
+Screenshots captured during browser-use skill sessions. Each row stores metadata about one screenshot along with a reference to the image stored in Convex file storage. Images are stored as PNGs via `ctx.storage.store()` since they can exceed the 1MB Convex document limit.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| jobId | id (jobs) | Reference to the job that produced this screenshot. |
+| jobType | string | The kind of skill that was running. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`. |
+| stepNumber | number | Zero-indexed step number in the agent's action history. |
+| pageUrl | string | The URL the browser was visiting when the screenshot was taken. |
+| pageTitle | string | The page title at the time the screenshot was taken. |
+| storageId | id (_storage) | Convex file storage ID for the PNG image. Resolve to a public URL via `ctx.storage.getUrl()`. |
+
+**Indexes:**
+- `by_job_type` — on `jobType`. For listing all screenshots from a given skill type.
+- `by_job_id` — on `jobId`. For listing all screenshots from a specific job.
+
+**Written by:** Background actions after `POST /search-rentals`, `POST /moving-pipeline` (U-Haul sub-job), `POST /update-address`, `POST /order-furniture`
+
+**Read by:** `GET /screenshots?job_type=...`, `GET /screenshots?job_id=...`

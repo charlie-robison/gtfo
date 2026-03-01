@@ -59,6 +59,24 @@ def _strip_markdown_fences(text: str) -> str:
     return text
 
 
+# ── Helpers ──────────────────────────────────────────────────────
+
+
+def extract_screenshots(result) -> list[dict]:
+    """Extract base64 screenshots from an AgentHistoryList returned by agent.run()."""
+    screenshots = []
+    for i, history_item in enumerate(result.history):
+        screenshot_b64 = history_item.state.get_screenshot()
+        if screenshot_b64:
+            screenshots.append({
+                "stepNumber": i,
+                "pageUrl": history_item.state.url or "",
+                "pageTitle": history_item.state.title or "",
+                "screenshotBase64": screenshot_b64,
+            })
+    return screenshots
+
+
 # ── Skill Endpoints ──────────────────────────────────────────────
 
 
@@ -80,12 +98,13 @@ async def run_search_rentals(params: dict):
             max_results=params.get("maxResults", 5),
         )
 
+        screenshots = extract_screenshots(result)
         agent_output = str(result)
         listings = parse_redfin_results(agent_output)
-        return {"listings": listings}
+        return {"listings": listings, "screenshots": screenshots}
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}", "listings": []}
+        return {"error": f"{type(e).__name__}: {e}", "listings": [], "screenshots": []}
 
 
 @app.post("/run-moving-analysis")
@@ -234,11 +253,14 @@ async def run_order_uhaul(params: dict):
             loading_address=params.get("loadingAddress", ""),
         )
 
+        screenshots = extract_screenshots(result)
         agent_output = str(result)
-        return parse_uhaul_result(agent_output)
+        parsed = parse_uhaul_result(agent_output)
+        parsed["screenshots"] = screenshots
+        return parsed
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}"}
+        return {"error": f"{type(e).__name__}: {e}", "screenshots": []}
 
 
 @app.post("/run-update-address")
@@ -247,7 +269,7 @@ async def run_update_address(params: dict):
     from server.skills.update_amazon_address import update_amazon_address
 
     try:
-        await update_amazon_address(
+        result = await update_amazon_address(
             full_name=params["fullName"],
             street_address=params["streetAddress"],
             city=params["city"],
@@ -255,10 +277,11 @@ async def run_update_address(params: dict):
             zip_code=params["zipCode"],
             phone=params.get("phone", ""),
         )
-        return {"message": "Updated all addresses to new address!"}
+        screenshots = extract_screenshots(result)
+        return {"message": "Updated all addresses to new address!", "screenshots": screenshots}
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}"}
+        return {"error": f"{type(e).__name__}: {e}", "screenshots": []}
 
 
 @app.post("/run-order-furniture")
@@ -268,7 +291,8 @@ async def run_order_furniture(params: dict):
 
     try:
         result = await amazon_furniture_cart(furniture_items=params["items"])
-        return {"summary": str(result)}
+        screenshots = extract_screenshots(result)
+        return {"summary": str(result), "screenshots": screenshots}
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}"}
+        return {"error": f"{type(e).__name__}: {e}", "screenshots": []}

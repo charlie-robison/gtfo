@@ -73,4 +73,15 @@ export default defineSchema({
   amazon_order_summary: defineTable({
     summary: v.string(),
   }),
+
+  screenshots: defineTable({
+    jobId: v.id("jobs"),
+    jobType: v.string(), // search_rentals | order_uhaul | update_address | order_furniture
+    stepNumber: v.number(),
+    pageUrl: v.string(),
+    pageTitle: v.string(),
+    storageId: v.id("_storage"),
+  })
+    .index("by_job_type", ["jobType"])
+    .index("by_job_id", ["jobId"]),
 });
