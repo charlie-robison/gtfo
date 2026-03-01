@@ -231,15 +231,19 @@ export const runOrderUhaul = action({
 
       const uhaulData = await resp.json();
 
+      if (uhaulData.error) {
+        throw new Error(`U-Haul order failed: ${uhaulData.error}`);
+      }
+
       await ctx.runMutation(api.mutations.insertUhaulInformation, {
-        vehicle: uhaulData.vehicle ?? "",
-        pickupLocation: uhaulData.pickupLocation ?? "",
-        pickupTime: uhaulData.pickupTime ?? "",
-        dropOffLocation: uhaulData.dropOffLocation ?? "",
-        movingHelpProvider: uhaulData.movingHelpProvider ?? "",
-        numWorkers: uhaulData.numWorkers ?? 0,
-        numHours: uhaulData.numHours ?? 0,
-        totalCost: uhaulData.totalCost ?? 0,
+        vehicle: String(uhaulData.vehicle ?? ""),
+        pickupLocation: String(uhaulData.pickupLocation ?? ""),
+        pickupTime: String(uhaulData.pickupTime ?? ""),
+        dropOffLocation: String(uhaulData.dropOffLocation ?? ""),
+        movingHelpProvider: String(uhaulData.movingHelpProvider ?? ""),
+        numWorkers: Number(uhaulData.numWorkers) || 0,
+        numHours: Number(uhaulData.numHours) || 0,
+        totalCost: Number(String(uhaulData.totalCost).replace(/[^0-9.]/g, "")) || 0,
       });
 
       await ctx.runMutation(api.mutations.completeJob, {
