@@ -149,3 +149,4 @@ async function askOpenClaw(message: string) {
 - **Response time** — Expect 5-30 seconds depending on how many tools the agent calls.
 - **ngrok URL may change** — If ngrok restarts, the URL changes. Get the current one from the ngrok terminal or run: `curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'`
 - **Streaming** — Set `"stream": true` to receive Server-Sent Events (SSE) for real-time response rendering.
+

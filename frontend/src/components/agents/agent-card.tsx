@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AgentSession, AgentStatus } from "@/types";
 import { AgentScreenshot } from "./agent-screenshot";
 import { cn } from "@/lib/utils";
-import { Check, Loader2, AlertTriangle, XCircle } from "lucide-react";
+import { Check, Loader2, AlertTriangle, XCircle, Ban } from "lucide-react";
 
 const statusConfig: Record<
   AgentStatus,
@@ -35,6 +35,11 @@ const statusConfig: Record<
   failed: {
     label: "Failed",
     className: "bg-red-500/10 text-red-400 border-red-500/20",
+    icon: XCircle,
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-gray-500/10 text-gray-400 border-gray-500/20",
     icon: XCircle,
   },
 };
@@ -76,10 +81,11 @@ interface AgentCardProps {
   agent: AgentSession;
   compact?: boolean;
   onClick?: () => void;
+  onCancel?: () => void;
   screenshotUrl?: string | null;
 }
 
-export function AgentCard({ agent, compact, onClick, screenshotUrl }: AgentCardProps) {
+export function AgentCard({ agent, compact, onClick, onCancel, screenshotUrl }: AgentCardProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
 
@@ -115,6 +121,17 @@ export function AgentCard({ agent, compact, onClick, screenshotUrl }: AgentCardP
               <Button size="sm" className="h-5 px-2 text-[10px] bg-amber-600 hover:bg-amber-700 gap-0.5 shrink-0">
                 <Check className="w-2.5 h-2.5" />
                 Approve
+              </Button>
+            )}
+            {onCancel && (agent.status === "running" || agent.status === "initializing") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-5 px-1.5 text-[10px] gap-0.5 shrink-0 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                onClick={(e) => { e.stopPropagation(); onCancel(); }}
+              >
+                <Ban className="w-2.5 h-2.5" />
+                Cancel
               </Button>
             )}
           </div>

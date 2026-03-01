@@ -322,6 +322,31 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
+// ── POST /cancel-job ─────────────────────────────────────────────
+
+http.route({
+  path: "/cancel-job",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const jobId = body.job_id;
+
+    if (!jobId) {
+      return jsonResponse({ error: "job_id is required" }, 400);
+    }
+
+    await ctx.runMutation(api.mutations.cancelJob, { jobId });
+
+    return jsonResponse({ ok: true });
+  }),
+});
+
+http.route({
+  path: "/cancel-job",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
 // ── POST /cancel-current-lease ───────────────────────────────────
 
 http.route({

@@ -119,7 +119,8 @@ export type AgentStatus =
   | "running"
   | "waiting_approval"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface AgentLogEntry {
   timestamp: string;
