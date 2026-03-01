@@ -29,6 +29,7 @@ async def order_uhaul(
     vehicle_type: str = "truck",
     num_workers: int = 0,
     loading_address: str = "",
+    screenshot_loop=None,
 ):
     """
     Search for and reserve a U-Haul, stopping before payment.
@@ -171,7 +172,14 @@ STEP 6 — STOP before payment:
         },
         use_vision=True,
     )
-    result = await agent.run()
+    bg_task = None
+    if screenshot_loop:
+        bg_task = asyncio.create_task(screenshot_loop(browser))
+    try:
+        result = await agent.run()
+    finally:
+        if bg_task:
+            bg_task.cancel()
     return result
 
 

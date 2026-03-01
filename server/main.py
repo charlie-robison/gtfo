@@ -15,12 +15,14 @@ Run:
   cd server && uvicorn main:app --reload
 """
 
+import asyncio
 import base64
 import json
+import os
 import sys
-import traceback
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +30,8 @@ from openai import AsyncOpenAI
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
 
 from server.utils import parse_redfin_results, parse_uhaul_result
 
@@ -62,19 +66,62 @@ def _strip_markdown_fences(text: str) -> str:
 # ── Helpers ──────────────────────────────────────────────────────
 
 
-def extract_screenshots(result) -> list[dict]:
-    """Extract base64 screenshots from an AgentHistoryList returned by agent.run()."""
-    screenshots = []
-    for i, history_item in enumerate(result.history):
-        screenshot_b64 = history_item.state.get_screenshot()
-        if screenshot_b64:
-            screenshots.append({
-                "stepNumber": i,
-                "pageUrl": history_item.state.url or "",
-                "pageTitle": history_item.state.title or "",
-                "screenshotBase64": screenshot_b64,
-            })
-    return screenshots
+async def push_screenshot_to_convex(
+    job_id: str,
+    job_type: str,
+    step: int,
+    url: str,
+    title: str,
+    b64: str,
+) -> None:
+    """POST a single screenshot to the Convex HTTP endpoint for storage."""
+    if not CONVEX_SITE_URL:
+        return
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{CONVEX_SITE_URL}/screenshots/upload",
+            json={
+                "jobId": job_id,
+                "jobType": job_type,
+                "stepNumber": step,
+                "pageUrl": url,
+                "pageTitle": title,
+                "screenshotBase64": b64,
+            },
+            timeout=30,
+        )
+
+
+def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
+    """Return an async function that periodically captures browser screenshots."""
+
+    async def _loop(browser):
+        step = 0
+        while True:
+            try:
+                page = await browser.get_current_page()
+                if page:
+                    screenshot_b64 = await page.screenshot()
+                    url = page.url if hasattr(page, "url") else ""
+                    title = ""
+                    try:
+                        title = await page.title() if callable(getattr(page, "title", None)) else ""
+                    except Exception:
+                        pass
+                    await push_screenshot_to_convex(
+                        job_id=job_id,
+                        job_type=job_type,
+                        step=step,
+                        url=url or "",
+                        title=title or "",
+                        b64=screenshot_b64,
+                    )
+                    step += 1
+            except Exception:
+                pass  # swallow errors so the agent doesn't crash
+            await asyncio.sleep(interval)
+
+    return _loop
 
 
 # ── Skill Endpoints ──────────────────────────────────────────────
@@ -84,6 +131,10 @@ def extract_screenshots(result) -> list[dict]:
 async def run_search_rentals(params: dict):
     """Run the Redfin search skill and return parsed listings."""
     from server.skills.search_redfin_rentals import search_and_contact_redfin_rentals
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "search_rentals")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
         result = await search_and_contact_redfin_rentals(
@@ -96,15 +147,15 @@ async def run_search_rentals(params: dict):
             min_bedrooms=params.get("minBedrooms", 1),
             min_bathrooms=params.get("minBathrooms", 1),
             max_results=params.get("maxResults", 5),
+            screenshot_loop=loop,
         )
 
-        screenshots = extract_screenshots(result)
         agent_output = str(result)
         listings = parse_redfin_results(agent_output)
-        return {"listings": listings, "screenshots": screenshots}
+        return {"listings": listings}
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}", "listings": [], "screenshots": []}
+        return {"error": f"{type(e).__name__}: {e}", "listings": []}
 
 
 @app.post("/run-moving-analysis")
@@ -242,6 +293,10 @@ async def run_order_uhaul(params: dict):
     """Run the U-Haul ordering skill and return parsed result."""
     from server.skills.order_uhaul import order_uhaul
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "order_uhaul")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
         result = await order_uhaul(
             pickup_location=params["pickupLocation"],
@@ -251,22 +306,25 @@ async def run_order_uhaul(params: dict):
             vehicle_type=params.get("vehicleType", "truck"),
             num_workers=params.get("numWorkers", 0),
             loading_address=params.get("loadingAddress", ""),
+            screenshot_loop=loop,
         )
 
-        screenshots = extract_screenshots(result)
         agent_output = str(result)
         parsed = parse_uhaul_result(agent_output)
-        parsed["screenshots"] = screenshots
         return parsed
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}", "screenshots": []}
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 @app.post("/run-update-address")
 async def run_update_address(params: dict):
     """Run the Amazon address update skill."""
     from server.skills.update_amazon_address import update_amazon_address
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "update_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
         result = await update_amazon_address(
@@ -276,12 +334,12 @@ async def run_update_address(params: dict):
             state=params["state"],
             zip_code=params["zipCode"],
             phone=params.get("phone", ""),
+            screenshot_loop=loop,
         )
-        screenshots = extract_screenshots(result)
-        return {"message": "Updated all addresses to new address!", "screenshots": screenshots}
+        return {"message": "Updated all addresses to new address!"}
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}", "screenshots": []}
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 @app.post("/run-order-furniture")
@@ -289,10 +347,16 @@ async def run_order_furniture(params: dict):
     """Run the Amazon furniture cart skill."""
     from server.skills.amazon_furniture_cart import amazon_furniture_cart
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "order_furniture")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
-        result = await amazon_furniture_cart(furniture_items=params["items"])
-        screenshots = extract_screenshots(result)
-        return {"summary": str(result), "screenshots": screenshots}
+        result = await amazon_furniture_cart(
+            furniture_items=params["items"],
+            screenshot_loop=loop,
+        )
+        return {"summary": str(result)}
 
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {e}", "screenshots": []}
+        return {"error": f"{type(e).__name__}: {e}"}

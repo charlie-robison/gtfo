@@ -35,6 +35,7 @@ async def search_and_contact_redfin_rentals(
     min_bedrooms: int = 1,
     min_bathrooms: int = 1,
     max_results: int = 10,
+    screenshot_loop=None,
 ):
     """
     Search Redfin for rental listings and fill out the contact form for each
@@ -167,7 +168,14 @@ After processing all tabs, summarize:
         },
         use_vision=True,
     )
-    result = await agent.run()
+    bg_task = None
+    if screenshot_loop:
+        bg_task = asyncio.create_task(screenshot_loop(browser))
+    try:
+        result = await agent.run()
+    finally:
+        if bg_task:
+            bg_task.cancel()
     return result
 
 

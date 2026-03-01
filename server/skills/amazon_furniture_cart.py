@@ -17,7 +17,7 @@ AMAZON_EMAIL = os.getenv("AMAZON_EMAIL", "")
 AMAZON_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
 
 
-async def amazon_furniture_cart(furniture_items: list[str]) -> object:
+async def amazon_furniture_cart(furniture_items: list[str], screenshot_loop=None) -> object:
     """
     Search for furniture items on Amazon, add each to cart, and proceed to checkout.
 
@@ -82,7 +82,14 @@ Go to https://www.amazon.com and do the following:
         },
         use_vision=True,
     )
-    result = await agent.run()
+    bg_task = None
+    if screenshot_loop:
+        bg_task = asyncio.create_task(screenshot_loop(browser))
+    try:
+        result = await agent.run()
+    finally:
+        if bg_task:
+            bg_task.cancel()
     return result
 
 

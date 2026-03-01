@@ -354,6 +354,44 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
+// ── POST /screenshots/upload ─────────────────────────────────────
+
+http.route({
+  path: "/screenshots/upload",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const { jobId, jobType, stepNumber, pageUrl, pageTitle, screenshotBase64 } = body;
+
+    if (!jobId || !screenshotBase64) {
+      return jsonResponse({ error: "jobId and screenshotBase64 are required" }, 400);
+    }
+
+    const binary = Uint8Array.from(atob(screenshotBase64), (c) =>
+      c.charCodeAt(0),
+    );
+    const blob = new Blob([binary], { type: "image/png" });
+    const storageId = await ctx.storage.store(blob);
+
+    await ctx.runMutation(api.mutations.insertScreenshot, {
+      jobId,
+      jobType: jobType ?? "",
+      stepNumber: stepNumber ?? 0,
+      pageUrl: pageUrl ?? "",
+      pageTitle: pageTitle ?? "",
+      storageId,
+    });
+
+    return jsonResponse({ ok: true, storageId });
+  }),
+});
+
+http.route({
+  path: "/screenshots/upload",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
 // ── GET /screenshots ────────────────────────────────────────────
 
 http.route({

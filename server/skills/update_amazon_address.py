@@ -25,6 +25,7 @@ async def update_amazon_address(
     country: str = "United States",
     phone: str = "",
     is_default: bool = True,
+    screenshot_loop=None,
 ):
     """
     Update the delivery address on Amazon.
@@ -90,7 +91,14 @@ Go to https://www.amazon.com/a/addresses and do the following:
         },
         use_vision=True,
     )
-    result = await agent.run()
+    bg_task = None
+    if screenshot_loop:
+        bg_task = asyncio.create_task(screenshot_loop(browser))
+    try:
+        result = await agent.run()
+    finally:
+        if bg_task:
+            bg_task.cancel()
     return result
 
 
