@@ -151,11 +151,17 @@ async def run_search_rentals(params: dict):
             min_bedrooms=params.get("minBedrooms", 1),
             min_bathrooms=params.get("minBathrooms", 1),
             max_results=params.get("maxResults", 5),
+            zipcode=params.get("zipcode", ""),
             screenshot_loop=loop,
         )
 
-        agent_output = str(result)
-        listings = parse_redfin_results(agent_output)
+        # Fast path returns structured JSON directly — skip LLM parsing
+        if isinstance(result, dict) and "__fast_listings" in result:
+            listings = result["__fast_listings"]
+        else:
+            agent_output = str(result)
+            listings = parse_redfin_results(agent_output)
+
         return {"listings": listings}
 
     except Exception as e:

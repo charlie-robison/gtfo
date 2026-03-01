@@ -78,6 +78,23 @@ export const runSearchRentals = action({
         jobId,
         result: { listingsCount: listings.length },
       });
+
+      // Immediately schedule apply jobs for all found listings
+      if (listings.length > 0) {
+        const applyParams = {
+          fullName: params.fullName,
+          phone: params.phone,
+          moveInDate: params.moveInDate,
+        };
+        const applyJobId = await ctx.runMutation(api.mutations.createJob, {
+          type: "apply_to_listings",
+          params: applyParams,
+        });
+        await ctx.scheduler.runAfter(0, api.actions.runApplyToListings, {
+          jobId: applyJobId,
+          params: applyParams,
+        });
+      }
     } catch (e: any) {
       await ctx.runMutation(api.mutations.failJob, {
         jobId,

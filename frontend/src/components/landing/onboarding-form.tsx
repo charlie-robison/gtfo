@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { askOpenClaw } from "@/lib/openclaw";
+import {
+  searchRentals,
+  cancelCurrentLease,
+  determineAddresses,
+} from "@/lib/endpoints";
 
 export function OnboardingForm() {
   const router = useRouter();
@@ -23,27 +27,51 @@ export function OnboardingForm() {
     const val = (id: string) =>
       (form.elements.namedItem(id) as HTMLInputElement).value;
 
+    const fullName = val("full-name");
+    const phone = val("phone");
+    const initialAddress = val("initial-address");
+    const landlordEmail = val("landlord-email");
+    const city = val("city");
+    const state = val("state");
+    const zipcode = val("zipcode");
+    const budget = Number(val("budget"));
+    const minBedrooms = Number(val("min-bedrooms"));
+    const minBathrooms = Number(val("min-bathrooms"));
+
     const moveDate = val("move-in-date");
     const [year, month, day] = moveDate.split("-");
     const moveDateFormatted = `${month}/${day}/${year}`;
 
-    const message = [
-      `Full Name: ${val("full-name")}`,
-      `Phone: ${val("phone")}`,
-      `Initial Address: ${val("initial-address")}`,
-      `Landlord Email: ${val("landlord-email")}`,
-      `City: ${val("city")}`,
-      `State: ${val("state")}`,
-      `Move-in Date: ${moveDateFormatted}`,
-      `Budget: $${val("budget")}`,
-      `Min Bedrooms: ${val("min-bedrooms")}`,
-      `Min Bathrooms: ${val("min-bathrooms")}`,
-    ].join("\n");
+    // Fire all 3 in parallel — no OpenClaw delay
+    // 1. Search rentals (backend auto-triggers apply jobs once listings are found)
+    searchRentals({
+      budget,
+      city,
+      state,
+      zipcode,
+      full_name: fullName,
+      phone,
+      move_in_date: moveDateFormatted,
+      min_bedrooms: minBedrooms,
+      min_bathrooms: minBathrooms,
+      initial_address: initialAddress,
+    }).catch(console.error);
 
-    // Fire-and-forget — navigate immediately, let OpenClaw run in the background
-    askOpenClaw(message).catch((err) =>
-      console.error("OpenClaw error:", err)
-    );
+    // 2. Cancel current lease
+    cancelCurrentLease({
+      landlord_email: landlordEmail,
+      tenant_name: fullName,
+      current_address: initialAddress,
+      lease_end_date: moveDateFormatted,
+      move_out_date: moveDateFormatted,
+    }).catch(console.error);
+
+    // 3. Determine addresses (email scan)
+    determineAddresses({
+      old_street: initialAddress,
+      old_city: city,
+      old_state: state,
+    }).catch(console.error);
 
     router.push("/dashboard");
   };
@@ -58,7 +86,7 @@ export function OnboardingForm() {
               <Input
                 id="full-name"
                 placeholder="Charlie Robison"
-                defaultValue="Charlie Robison"
+                defaultValue="Brycen Mcormick"
               />
             </div>
             <div className="space-y-2">
@@ -76,8 +104,8 @@ export function OnboardingForm() {
             <Label htmlFor="initial-address">Initial Address</Label>
             <Input
               id="initial-address"
-              placeholder="7263 Kanoenoe Street"
-              defaultValue="7263 Kanoenoe Street"
+              placeholder="5122 Mertola Drive"
+              defaultValue="5122 Mertola Drive"
             />
           </div>
 
@@ -86,18 +114,18 @@ export function OnboardingForm() {
             <Input
               id="landlord-email"
               type="email"
-              placeholder="landlord@example.com"
-              defaultValue="landlord@example.com"
+              placeholder="charlierobison480@gmail.com"
+              defaultValue="charlierobison480@gmail.com"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
               <Input
                 id="city"
-                placeholder="El Dorado Hills"
-                defaultValue="El Dorado Hills"
+                placeholder="San Francisco"
+                defaultValue="San Francisco"
               />
             </div>
             <div className="space-y-2">
@@ -108,6 +136,14 @@ export function OnboardingForm() {
                 defaultValue="CA"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="zipcode">Zip</Label>
+              <Input
+                id="zipcode"
+                placeholder="94102"
+                defaultValue="94102"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -116,7 +152,7 @@ export function OnboardingForm() {
               <Input
                 id="move-in-date"
                 type="date"
-                defaultValue="2026-02-28"
+                defaultValue="2026-03-12"
               />
             </div>
             <div className="space-y-2">
@@ -124,8 +160,8 @@ export function OnboardingForm() {
               <Input
                 id="budget"
                 type="number"
-                placeholder="5000"
-                defaultValue="5000"
+                placeholder="10000"
+                defaultValue="10000"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">

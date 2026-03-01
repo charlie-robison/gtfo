@@ -38,6 +38,7 @@ export interface SearchRentalsRequest {
   budget: number;
   city: string;
   state: string;
+  zipcode?: string;
   full_name: string;
   phone: string;
   move_in_date: string;
@@ -239,6 +240,10 @@ export function updateSouthwestAddress(data: AddressUpdateRequest) {
 
 export function updateDoordashAddress(data: AddressUpdateRequest) {
   return post<JobResponse>("/update-doordash-address", data);
+}
+
+export function applyToListings(data: { full_name: string; phone: string; move_in_date: string }) {
+  return post<JobResponse>("/apply-to-listings", data);
 }
 
 export function cancelCurrentLease(data: CancelLeaseRequest) {

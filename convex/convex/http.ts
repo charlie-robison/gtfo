@@ -57,6 +57,7 @@ http.route({
     const params = {
       city: body.city,
       state: body.state,
+      zipcode: body.zipcode ?? "",
       maxRent: body.budget - 1000,
       fullName: body.full_name,
       phone: body.phone,

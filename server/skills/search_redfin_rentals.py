@@ -31,13 +31,26 @@ def _get_redfin_search_url(
     max_rent: int,
     min_bedrooms: int,
     min_bathrooms: int,
+    zipcode: str = "",
 ) -> str | None:
     """
-    Build a pre-filtered Redfin rentals URL by hitting the autocomplete API
-    to resolve the city slug, then appending filter parameters.
+    Build a pre-filtered Redfin rentals URL.
 
-    Returns None if autocomplete fails (caller builds a fallback prompt).
+    If a zipcode is provided (from the form), uses /zipcode/{zip}/apartments-for-rent/filter/...
+    which loads instantly without any API lookup.
+
+    Falls back to Redfin autocomplete API (usually blocked by WAF from server-side).
+
+    Returns None if all strategies fail (caller builds a browser-based fallback).
     """
+    price = _format_price(max_rent)
+    filters = f"max-price={price},min-beds={min_bedrooms},min-baths={min_bathrooms}"
+
+    # Strategy 1: zipcode from form (instant, no API call)
+    if zipcode:
+        return f"https://www.redfin.com/zipcode/{zipcode}/apartments-for-rent/filter/{filters}"
+
+    # Strategy 2: Redfin autocomplete (usually returns 403 from server-side)
     try:
         resp = _requests.get(
             "https://www.redfin.com/stingray/do/location-autocomplete",
@@ -55,8 +68,6 @@ def _get_redfin_search_url(
             for item in section.get("rows", []):
                 item_url = item.get("url", "")
                 if "/city/" in item_url or "/neighborhood/" in item_url:
-                    price = _format_price(max_rent)
-                    filters = f"max-price={price},min-beds={min_bedrooms},min-baths={min_bathrooms}"
                     return f"https://www.redfin.com{item_url}/rentals/filter/{filters}"
     except Exception:
         pass
@@ -92,6 +103,98 @@ def _build_autocomplete_js(city: str, state: str) -> str:
     """
 
 
+def _build_extract_listings_js(max_results: int, city: str) -> str:
+    """JavaScript that scrapes Redfin rental listing cards from the DOM."""
+    return """
+    (() => {
+        const cards = document.querySelectorAll(
+            '.HomeCardContainer, .MapHomeCardReact, .RentalHomeCard, [data-rf-test-id="mapHomeCard"]'
+        );
+        const results = [];
+        for (const card of cards) {
+            if (results.length >= """ + str(max_results) + """) break;
+            const linkEl = card.querySelector('a[href*="/rental/"], a[href*="/apartment/"], a.link-and-anchor');
+            const href = linkEl ? linkEl.getAttribute('href') : '';
+            const url = href.startsWith('http') ? href : (href ? 'https://www.redfin.com' + href : '');
+            if (!url) continue;
+
+            const priceEl = card.querySelector('.homecardV2Price, .HomeCardContainer--price, [data-rf-test-id="homecard-price"]');
+            const priceText = priceEl ? priceEl.textContent.replace(/[^0-9]/g, '') : '0';
+
+            const statsEls = card.querySelectorAll('.HomeStatsV2 .stats, .HomeCardContainer--stat, .HomeStatsV2 div');
+            let beds = 0, baths = 0, sqft = 0;
+            for (const s of statsEls) {
+                const t = s.textContent.toLowerCase();
+                if (t.includes('bed')) beds = parseInt(t) || 0;
+                else if (t.includes('bath')) baths = parseInt(t) || 0;
+                else if (t.includes('sq')) sqft = parseInt(t.replace(/,/g, '')) || 0;
+            }
+
+            const imgEl = card.querySelector('img[src*="ssl.cdn-redfin"], img[src*="redfin"], img.HomeCard__Photo--image');
+            const imageUrl = imgEl ? imgEl.getAttribute('src') : '';
+
+            const addrEl = card.querySelector('.homeAddressV2, .link-and-anchor, .HomeCardContainer--address');
+            const address = addrEl ? addrEl.textContent.trim() : '';
+
+            const descParts = [];
+            if (beds) descParts.push(beds + ' bed');
+            if (baths) descParts.push(baths + ' bath');
+            if (sqft) descParts.push(sqft + ' sqft');
+
+            results.push({
+                name: address || 'Rental Listing',
+                address: address,
+                city: '""" + city + """',
+                description: descParts.join(', '),
+                imageUrl: imageUrl,
+                monthlyRentPrice: parseInt(priceText) || 0,
+                numBedrooms: beds,
+                numBathrooms: baths,
+                squareFootage: sqft,
+                moveInCost: 0,
+                url: url,
+            });
+        }
+        return JSON.stringify(results);
+    })()
+    """
+
+
+async def _fast_scrape(
+    url: str,
+    max_results: int,
+    city: str,
+    screenshot_loop=None,
+) -> list[dict]:
+    """Navigate directly via CDP and extract listings with JS — no LLM needed."""
+    extract_js = _build_extract_listings_js(max_results, city)
+
+    browser = Browser(headless=False, keep_alive=True, enable_default_extensions=False)
+    bg_task = None
+    if screenshot_loop:
+        bg_task = asyncio.create_task(screenshot_loop(browser))
+    try:
+        await browser.start()
+        await browser.navigate_to(url)
+        # Wait for listing cards to render
+        await asyncio.sleep(3)
+
+        # Run JS extraction via CDP Runtime.evaluate
+        cdp_session = await browser.get_or_create_cdp_session()
+        result = await cdp_session.cdp_client.send.Runtime.evaluate(
+            params={"expression": extract_js, "returnByValue": True, "awaitPromise": True},
+            session_id=cdp_session.session_id,
+        )
+
+        raw = result.get("result", {}).get("value", "[]")
+        listings = json.loads(raw) if isinstance(raw, str) else raw
+        return listings if isinstance(listings, list) else []
+    finally:
+        if bg_task:
+            bg_task.cancel()
+        await browser.stop()
+
+
 async def search_redfin_rentals(
     city: str,
     state: str,
@@ -100,78 +203,39 @@ async def search_redfin_rentals(
     min_bedrooms: int = 1,
     min_bathrooms: int = 1,
     max_results: int = 10,
+    zipcode: str = "",
     screenshot_loop=None,
 ):
-    # """
-    # Search Redfin for rental listings and collect detailed information.
+    # ── Try to build direct URL (uses zipcode from form if available) ──
+    direct_url = _get_redfin_search_url(city, state, max_rent, min_bedrooms, min_bathrooms, zipcode)
 
-    # This skill only searches and collects data — it does NOT fill contact
-    # forms. Each listing is applied to separately via apply_redfin_listing.
+    # ── FAST PATH: direct CDP, zero LLM calls ──
+    if direct_url:
+        listings = await _fast_scrape(direct_url, max_results, city, screenshot_loop)
+        return {"__fast_listings": listings}
 
-    # Args:
-    #     city: City to search in (e.g. "Sacramento")
-    #     state: State abbreviation (e.g. "CA")
-    #     max_rent: Maximum monthly rent budget in dollars (e.g. 2000)
-    #     max_move_in_cost: Maximum move-in cost budget in dollars. Set to 0 to skip.
-    #     min_bedrooms: Minimum number of bedrooms (default: 1)
-    #     min_bathrooms: Minimum number of bathrooms (default: 1)
-    #     max_results: Maximum number of listings to collect (default: 10)
-    # """
-
-    # ── Try to build direct URL from Python first ──
-    direct_url = _get_redfin_search_url(city, state, max_rent, min_bedrooms, min_bathrooms)
-
+    # ── SLOW PATH: LLM agent navigates manually ──
     price_slug = _format_price(max_rent)
     filters = f"max-price={price_slug},min-beds={min_bedrooms},min-baths={min_bathrooms}"
+    extract_js = _build_extract_listings_js(max_results, city)
 
-    # ── Build initial_actions to skip LLM navigation steps ──
-    # NOTE: navigate and evaluate both have terminates_sequence=True in
-    # browser-use, so only ONE action per initial_actions list actually runs.
-    if direct_url:
-        # Python autocomplete worked — navigate straight to filtered results
-        initial_actions = [
-            {"navigate": {"url": direct_url, "new_tab": False}},
-        ]
-        max_steps = 5
-        task = f"""You are on a Redfin rental listings page. Extract up to {max_results} listings from the cards visible on the page.
-For each listing provide:
-  - name: property name or address
-  - address: full street address
-  - city: "{city}"
-  - description: beds/baths/sqft from the card
-  - imageUrl: the listing photo URL (img src on card)
-  - monthlyRentPrice: rent in dollars (number only)
-  - numBedrooms / numBathrooms / squareFootage (0 if unknown)
-  - moveInCost: 0
-  - url: the Redfin listing URL (href on card)
-Do NOT open individual listing pages."""
-    else:
-        # Python autocomplete blocked — navigate to redfin.com, then the LLM
-        # runs the autocomplete JS from the browser (same-origin bypasses WAF).
-        autocomplete_js = _build_autocomplete_js(city, state)
-        initial_actions = [
-            {"navigate": {"url": "https://www.redfin.com", "new_tab": False}},
-        ]
-        max_steps = 10
-        task = f"""You are on redfin.com. First, run this JavaScript using evaluate to resolve the city URL:
+    autocomplete_js = _build_autocomplete_js(city, state)
+    initial_actions = [
+        {"navigate": {"url": "https://www.redfin.com", "new_tab": False}},
+    ]
+    task = f"""You are on redfin.com. First, run this JavaScript using evaluate to resolve the city URL:
 ```js
 {autocomplete_js}
 ```
 The JS returns a path like "/city/16409/CA/Sacramento". Then navigate to:
   https://www.redfin.com{{that_path}}/rentals/filter/{filters}
 If the JS returned empty string, use the search bar to search "{city}, {state}" and apply filters: max ${max_rent:,}, {min_bedrooms}+ beds, {min_bathrooms}+ baths.
-Once on the listings page, extract up to {max_results} listings.
-For each listing provide:
-  - name: property name or address
-  - address: full street address
-  - city: "{city}"
-  - description: beds/baths/sqft from the card
-  - imageUrl: the listing photo URL (img src on card)
-  - monthlyRentPrice: rent in dollars (number only)
-  - numBedrooms / numBathrooms / squareFootage (0 if unknown)
-  - moveInCost: 0
-  - url: the Redfin listing URL (href on card)
-Do NOT open individual listing pages."""
+Once on the listings page, wait 2 seconds then run this JavaScript to extract listings:
+```js
+{extract_js}
+```
+The JS returns a JSON array. If empty, visually read up to {max_results} listings instead.
+Return the final result as the JSON array. Do NOT open individual listing pages."""
 
     browser = Browser(
         headless=False,
@@ -193,7 +257,7 @@ Do NOT open individual listing pages."""
     if screenshot_loop:
         bg_task = asyncio.create_task(screenshot_loop(browser))
     try:
-        result = await agent.run(max_steps=max_steps)
+        result = await agent.run(max_steps=6)
     finally:
         if bg_task:
             bg_task.cancel()
