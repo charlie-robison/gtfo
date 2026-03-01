@@ -95,11 +95,11 @@ STEP 1 — Sign in (skip if already signed in):
 STEP 2 — Start a reservation:
 1. On the homepage (or navigate back to it), find the reservation / quote form.
 2. Select the moving type. Choose "One-Way" if the pickup and drop-off locations are different, otherwise choose "In-Town".
-3. Fill in:
-   - Picking Up: {pickup_location}
-   - Dropping Off: {dropoff_location}
-   - Pick-Up Date: {pickup_date}
-   - Pick-Up Time: {pickup_time}
+3. Fill in the form fields. IMPORTANT: Each field may already contain a pre-filled address from the account. You MUST fully clear it before typing the new value. Never leave old text in the field.
+   - Picking Up: Click the field. Triple-click to select all text, then press Backspace/Delete to remove it. Verify the field is completely empty. Then type {pickup_location}. Wait for the autocomplete dropdown and select the matching suggestion.
+   - Dropping Off: Click the field. Triple-click to select all text, then press Backspace/Delete to remove it. Verify the field is completely empty. Then type {dropoff_location}. Wait for the autocomplete dropdown and select the matching suggestion.
+   - Pick-Up Date: Clear any pre-filled date first, then enter {pickup_date}.
+   - Pick-Up Time: Clear any pre-filled time first, then enter {pickup_time}.
 4. Click "Get Rates" or the equivalent search / submit button.
 
 STEP 3 — Choose a vehicle:
