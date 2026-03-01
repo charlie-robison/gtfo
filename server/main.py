@@ -5,13 +5,16 @@ Pure skill/agent execution layer. No database operations.
 Convex handles all reads, writes, and job management.
 
 Endpoints:
-  POST /run-search-rentals        — Run Redfin search skill, return parsed listings
-  POST /run-moving-analysis       — Run GPT-4o house analysis + furniture recs
-  POST /run-order-uhaul           — Run U-Haul ordering skill, return parsed result
-  POST /run-update-address        — Run Amazon address update skill
-  POST /run-order-furniture       — Run Amazon furniture cart skill
-  POST /run-determine-addresses   — Scan Gmail for services with stored addresses
-  POST /run-cancel-lease          — Send lease cancellation email via AgentMail
+  POST /run-search-rentals           — Run Redfin search skill, return parsed listings
+  POST /run-moving-analysis          — Run GPT-4o house analysis + furniture recs
+  POST /run-order-uhaul              — Run U-Haul ordering skill, return parsed result
+  POST /run-update-address           — Run Amazon address update skill
+  POST /run-order-furniture          — Run Amazon furniture cart skill
+  POST /run-update-cashapp-address   — Run Cash App address update skill
+  POST /run-update-southwest-address — Run Southwest address update skill
+  POST /run-update-doordash-address  — Run DoorDash address update skill
+  POST /run-determine-addresses      — Scan Gmail for services with stored addresses
+  POST /run-cancel-lease             — Send lease cancellation email via AgentMail
 
 Run:
   cd server && uvicorn main:app --reload
@@ -33,10 +36,10 @@ from openai import AsyncOpenAI
 load_dotenv(Path(__file__).resolve().parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
-
 from server.utils import parse_redfin_results, parse_uhaul_result
 from server.agent_mail import AgentMailClient, GmailClient, UserAddress, classify_services, scan_emails
+
+CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
 
 app = FastAPI(title="Automovers Skill Runner")
 
@@ -360,6 +363,75 @@ async def run_order_furniture(params: dict):
             screenshot_loop=loop,
         )
         return {"summary": str(result)}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-update-cashapp-address")
+async def run_update_cashapp_address(params: dict):
+    """Run the Cash App address update skill."""
+    from server.skills.update_cashapp_address import update_cashapp_address
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "update_cashapp_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
+    try:
+        await update_cashapp_address(
+            street_address=params["streetAddress"],
+            city=params["city"],
+            state=params["state"],
+            zip_code=params["zipCode"],
+            screenshot_loop=loop,
+        )
+        return {"message": "Updated Cash App address!"}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-update-southwest-address")
+async def run_update_southwest_address(params: dict):
+    """Run the Southwest Airlines address update skill."""
+    from server.skills.update_southwest_address import update_southwest_address
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "update_southwest_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
+    try:
+        await update_southwest_address(
+            street_address=params["streetAddress"],
+            city=params["city"],
+            state=params["state"],
+            zip_code=params["zipCode"],
+            screenshot_loop=loop,
+        )
+        return {"message": "Updated Southwest Airlines address!"}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-update-doordash-address")
+async def run_update_doordash_address(params: dict):
+    """Run the DoorDash address update skill."""
+    from server.skills.update_doordash_address import update_doordash_address
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "update_doordash_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
+    try:
+        await update_doordash_address(
+            street_address=params["streetAddress"],
+            city=params["city"],
+            state=params["state"],
+            zip_code=params["zipCode"],
+            screenshot_loop=loop,
+        )
+        return {"message": "Updated DoorDash address!"}
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}

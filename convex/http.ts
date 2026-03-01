@@ -184,6 +184,102 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
+// ── POST /update-cashapp-address ────────────────────────────────
+
+http.route({
+  path: "/update-cashapp-address",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    const params = {
+      streetAddress: body.street_address,
+      city: body.city,
+      state: body.state,
+      zipCode: body.zip_code,
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "update_cashapp_address",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runUpdateCashappAddress, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
+});
+
+http.route({
+  path: "/update-cashapp-address",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── POST /update-southwest-address ─────────────────────────────
+
+http.route({
+  path: "/update-southwest-address",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    const params = {
+      streetAddress: body.street_address,
+      city: body.city,
+      state: body.state,
+      zipCode: body.zip_code,
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "update_southwest_address",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runUpdateSouthwestAddress, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
+});
+
+http.route({
+  path: "/update-southwest-address",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── POST /update-doordash-address ──────────────────────────────
+
+http.route({
+  path: "/update-doordash-address",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    const params = {
+      streetAddress: body.street_address,
+      city: body.city,
+      state: body.state,
+      zipCode: body.zip_code,
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "update_doordash_address",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runUpdateDoordashAddress, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
+});
+
+http.route({
+  path: "/update-doordash-address",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
 // ── POST /cancel-current-lease ───────────────────────────────────
 
 http.route({

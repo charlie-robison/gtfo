@@ -3,7 +3,7 @@ import { v } from "convex/values";
 
 export default defineSchema({
   jobs: defineTable({
-    type: v.string(), // search_rentals | order_uhaul | update_address | order_furniture
+    type: v.string(), // search_rentals | order_uhaul | update_address | order_furniture | update_cashapp_address | update_southwest_address | update_doordash_address | determine_addresses | cancel_lease
     status: v.string(), // pending | running | completed | failed
     params: v.any(),
     result: v.optional(v.any()),
@@ -87,7 +87,7 @@ export default defineSchema({
 
   screenshots: defineTable({
     jobId: v.id("jobs"),
-    jobType: v.string(), // search_rentals | order_uhaul | update_address | order_furniture
+    jobType: v.string(),
     stepNumber: v.number(),
     pageUrl: v.string(),
     pageTitle: v.string(),

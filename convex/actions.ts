@@ -204,6 +204,123 @@ export const runOrderFurniture = action({
   },
 });
 
+// ── Update Cash App Address ─────────────────────────────────────
+
+export const runUpdateCashappAddress = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      const resp = await fetch(`${getFastapiUrl()}/run-update-cashapp-address`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify({ ...params, jobId, jobType: "update_cashapp_address" }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
+
+      const result = await resp.json();
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: result.message ?? "Updated Cash App address!",
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
+// ── Update Southwest Address ────────────────────────────────────
+
+export const runUpdateSouthwestAddress = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      const resp = await fetch(`${getFastapiUrl()}/run-update-southwest-address`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify({ ...params, jobId, jobType: "update_southwest_address" }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
+
+      const result = await resp.json();
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: result.message ?? "Updated Southwest address!",
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
+// ── Update DoorDash Address ─────────────────────────────────────
+
+export const runUpdateDoordashAddress = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      const resp = await fetch(`${getFastapiUrl()}/run-update-doordash-address`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify({ ...params, jobId, jobType: "update_doordash_address" }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
+
+      const result = await resp.json();
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: result.message ?? "Updated DoorDash address!",
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
 // ── Determine Addresses (email scan + classification) ───────────
 
 export const runDetermineAddresses = action({
