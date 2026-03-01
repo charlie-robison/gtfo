@@ -12,9 +12,9 @@ one browser session per listing, each with its own job ID and screenshots.
 import asyncio
 import json
 import requests as _requests
-from browser_use import Agent, Browser, ChatBrowserUse
+from browser_use import Agent, ChatBrowserUse
 from dotenv import load_dotenv
-from server.skills import disable_crashy_watchdogs
+from server.utils import create_skill_browser
 
 load_dotenv()
 
@@ -172,13 +172,11 @@ async def _fast_scrape(
     """Navigate directly via CDP and extract listings with JS — no LLM needed."""
     extract_js = _build_extract_listings_js(max_results, city)
 
-    browser = Browser(headless=False, keep_alive=True, enable_default_extensions=False)
+    browser = await create_skill_browser()
     bg_task = None
     if screenshot_loop:
         bg_task = asyncio.create_task(screenshot_loop(browser))
     try:
-        await browser.start()
-        disable_crashy_watchdogs(browser)
         await browser.navigate_to(url)
         # Wait for listing cards to render
         await asyncio.sleep(3)
@@ -241,14 +239,7 @@ Once on the listings page, wait 2 seconds then run this JavaScript to extract li
 The JS returns a JSON array. If empty, visually read up to {max_results} listings instead.
 Return the final result as the JSON array. Do NOT open individual listing pages."""
 
-    browser = Browser(
-        headless=False,
-        keep_alive=True,
-        enable_default_extensions=False,
-    )
-
-    await browser.start()
-    disable_crashy_watchdogs(browser)
+    browser = await create_skill_browser()
 
     llm = ChatBrowserUse()
     agent = Agent(

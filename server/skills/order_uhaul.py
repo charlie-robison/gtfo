@@ -9,9 +9,9 @@ the payment / credit-card step.
 import asyncio
 import os
 from pathlib import Path
-from browser_use import Agent, Browser, ChatBrowserUse
+from browser_use import Agent, ChatBrowserUse
 from dotenv import load_dotenv
-from server.skills import disable_crashy_watchdogs
+from server.utils import create_skill_browser
 
 load_dotenv()
 
@@ -101,12 +101,9 @@ When you see a credit card / payment form, STOP. Do NOT enter payment info.
 Report: vehicle selected, pickup location & date/time, drop-off location{step6_labor}, total estimated cost.
 """
 
-    browser = Browser(
-        headless=False,
-        keep_alive=True,
+    browser = await create_skill_browser(
         user_data_dir=UHAUL_PROFILE_DIR,
-        enable_default_extensions=False,
-        args=[
+        extra_args=[
             "--disable-features=AutofillServerCommunication",
             "--disable-save-password-bubble",
             "--password-store=basic",
@@ -117,17 +114,6 @@ Report: vehicle selected, pickup location & date/time, drop-off location{step6_l
             "--no-first-run",
         ],
     )
-
-    await browser.start()
-    disable_crashy_watchdogs(browser)
-    await browser._cdp_add_init_script("""
-        navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
-        navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
-        if (window.PublicKeyCredential) {
-            window.PublicKeyCredential.isConditionalMediationAvailable = () => Promise.resolve(false);
-            window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
-        }
-    """)
 
     # Pre-open both tabs so pages load while the agent initializes
     uhaul_page = await browser.get_current_page()

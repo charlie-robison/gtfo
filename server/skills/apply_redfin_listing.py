@@ -10,9 +10,9 @@ before clicking the final submit button.
 
 import asyncio
 import os
-from browser_use import Agent, Browser, ChatBrowserUse
+from browser_use import Agent, ChatBrowserUse
 from dotenv import load_dotenv
-from server.skills import disable_crashy_watchdogs
+from server.utils import create_skill_browser
 
 load_dotenv()
 
@@ -71,13 +71,7 @@ async def apply_redfin_listing(
 If you see a CAPTCHA, wait 10 seconds then attempt to solve it.
 """
 
-    browser = Browser(
-        headless=False,
-        keep_alive=True,
-        enable_default_extensions=False,
-    )
-    await browser.start()
-    disable_crashy_watchdogs(browser)
+    browser = await create_skill_browser()
 
     llm = ChatBrowserUse()
     agent = Agent(

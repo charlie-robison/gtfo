@@ -8,23 +8,14 @@ before placing the order (demo mode).
 
 import asyncio
 import os
-from browser_use import Agent, Browser, ChatBrowserUse
+from browser_use import Agent, ChatBrowserUse
 from dotenv import load_dotenv
-from server.skills import disable_crashy_watchdogs
+from server.utils import create_skill_browser
 
 load_dotenv()
 
 AMAZON_EMAIL = os.getenv("AMAZON_EMAIL", "")
 AMAZON_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
-
-_CDP_DISABLE_WEBAUTHN = """\
-navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
-navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
-if (window.PublicKeyCredential) {
-    window.PublicKeyCredential.isConditionalMediationAvailable = () => Promise.resolve(false);
-    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
-}"""
-
 
 async def amazon_furniture_cart(furniture_items: list[str], screenshot_loop=None) -> object:
     """
@@ -49,10 +40,8 @@ Items:
 After all items are added, click the cart icon, click "Proceed to checkout", then STOP. \
 Do NOT enter payment or place the order. Report a summary of cart items and total price."""
 
-    browser = Browser(
-        headless=False,
-        keep_alive=True,
-        args=[
+    browser = await create_skill_browser(
+        extra_args=[
             "--disable-features=AutofillServerCommunication",
             "--disable-save-password-bubble",
             "--password-store=basic",
@@ -64,12 +53,6 @@ Do NOT enter payment or place the order. Report a summary of cart items and tota
             "--disable-sync",
         ],
     )
-
-    # Start browser and disable WebAuthn/passkey API via CDP
-    # This prevents the iCloud Keychain "Use a saved passkey" dialog
-    await browser.start()
-    disable_crashy_watchdogs(browser)
-    await browser._cdp_add_init_script(_CDP_DISABLE_WEBAUTHN)
 
     agent = Agent(
         task=task,

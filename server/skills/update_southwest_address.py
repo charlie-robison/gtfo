@@ -14,9 +14,9 @@ Flow:
 
 import asyncio
 import os
-from browser_use import Agent, Browser, ChatBrowserUse
+from browser_use import Agent, ChatBrowserUse
 from dotenv import load_dotenv
-from server.skills import disable_crashy_watchdogs
+from server.utils import create_skill_browser
 
 load_dotenv()
 
@@ -80,26 +80,13 @@ STEP 5 — Confirm:
 2. Report that the address has been updated.
 """
 
-    browser = Browser(
-        headless=False,
-        keep_alive=True,
-        args=[
+    browser = await create_skill_browser(
+        extra_args=[
             "--disable-features=AutofillServerCommunication",
             "--disable-save-password-bubble",
             "--password-store=basic",
         ],
     )
-
-    await browser.start()
-    disable_crashy_watchdogs(browser)
-    await browser._cdp_add_init_script("""
-        navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
-        navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
-        if (window.PublicKeyCredential) {
-            window.PublicKeyCredential.isConditionalMediationAvailable = () => Promise.resolve(false);
-            window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
-        }
-    """)
 
     llm = ChatBrowserUse()
     agent = Agent(
