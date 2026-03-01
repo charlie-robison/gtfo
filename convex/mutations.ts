@@ -92,16 +92,34 @@ export const insertHouseInformation = mutation({
 
 export const insertRedfinApplication = mutation({
   args: {
+    name: v.string(),
     address: v.string(),
+    city: v.string(),
+    description: v.string(),
+    imageUrl: v.string(),
     monthlyRentPrice: v.number(),
     numBedrooms: v.number(),
     numBathrooms: v.number(),
     squareFootage: v.number(),
     moveInCost: v.number(),
     url: v.string(),
+    applicationStatus: v.string(),
+    applyJobId: v.optional(v.id("jobs")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("redfin_applications", args);
+  },
+});
+
+export const updateRedfinApplicationStatus = mutation({
+  args: {
+    applicationId: v.id("redfin_applications"),
+    applicationStatus: v.string(),
+    applyJobId: v.optional(v.id("jobs")),
+  },
+  handler: async (ctx, args) => {
+    const { applicationId, ...updates } = args;
+    await ctx.db.patch(applicationId, updates);
   },
 });
 

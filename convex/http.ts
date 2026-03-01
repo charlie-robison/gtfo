@@ -30,7 +30,7 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const body = await request.json();
-    const maxResults = 5;
+    const maxResults = body.max_results ?? 5;
 
     // Write search constraints to Convex
     await ctx.runMutation(api.mutations.insertSearchConstraints, {
@@ -46,14 +46,19 @@ http.route({
       initialAddress: body.initial_address ?? "",
     });
 
-    // Write step to Convex
+    // Write steps to Convex
     await ctx.runMutation(api.mutations.insertStep, {
       stepNum: 0,
+      stepName: "Search Listings",
+      currentCost: 0,
+    });
+    await ctx.runMutation(api.mutations.insertStep, {
+      stepNum: 1,
       stepName: "Apply to Listings",
       currentCost: 0,
     });
 
-    // Create job in Convex
+    // Create job in Convex — search phase
     const params = {
       city: body.city,
       state: body.state,
@@ -71,7 +76,7 @@ http.route({
       params,
     });
 
-    // Schedule background action
+    // Schedule background action (search → save → apply to each)
     await ctx.scheduler.runAfter(0, api.actions.runSearchRentals, { jobId, params });
 
     return jsonResponse({ job_id: jobId });

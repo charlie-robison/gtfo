@@ -10,17 +10,18 @@ interface ListingFiltersProps {
   onSortChange: (sort: string) => void;
 }
 
-const sources = [
-  { key: "all", label: "All Sources" },
-  { key: "zillow", label: "Zillow" },
-  { key: "redfin", label: "Redfin" },
-  { key: "apartments.com", label: "Apartments.com" },
+const statuses = [
+  { key: "all", label: "All" },
+  { key: "found", label: "Found" },
+  { key: "applying", label: "Applying" },
+  { key: "applied", label: "Applied" },
+  { key: "failed", label: "Failed" },
 ];
 
 const sorts = [
-  { key: "score", label: "AI Score" },
   { key: "price-asc", label: "Price: Low" },
   { key: "price-desc", label: "Price: High" },
+  { key: "move-in", label: "Move-in Cost" },
 ];
 
 export function ListingFilters({
@@ -32,7 +33,7 @@ export function ListingFilters({
   return (
     <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
       <div className="flex flex-wrap gap-2">
-        {sources.map((s) => (
+        {statuses.map((s) => (
           <Badge
             key={s.key}
             variant={source === s.key ? "default" : "secondary"}
