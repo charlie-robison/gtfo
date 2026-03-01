@@ -8,7 +8,7 @@ import { AgentOverlay } from "@/components/agents/agent-overlay";
 import { useJobStreams, type JobStream } from "@/hooks/use-job-streams";
 import { cancelJob } from "@/lib/endpoints";
 import { AgentSession } from "@/types";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Search, Mail, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OverrideDialog } from "@/components/dashboard/override-dialog";
 import {
@@ -48,8 +48,8 @@ const jobTypeLabels: Record<string, string> = {
   update_cashapp_address: "Cash App",
   update_southwest_address: "Southwest",
   update_doordash_address: "DoorDash",
-  determine_addresses: "Address Scan",
-  cancel_lease: "Lease Cancellation",
+  determine_addresses: "Finding Sites to Change Addresses",
+  cancel_lease: "Send Cancel Email",
 };
 
 /** Job types that support cancellation. */
@@ -61,6 +61,12 @@ const cancellableJobTypes = new Set([
   "update_southwest_address",
   "update_doordash_address",
 ]);
+
+/** Job types that show a hero icon instead of a browser screenshot. */
+const heroIcons: Record<string, LucideIcon> = {
+  determine_addresses: Search,
+  cancel_lease: Mail,
+};
 
 /** Build an AgentSession from a JobStream so existing card/overlay components work. */
 function toAgentSession(stream: JobStream): AgentSession {
@@ -155,6 +161,7 @@ export default function DashboardPage() {
                     screenshotUrl={stream.latestScreenshot?.url}
                     onClick={() => setSelectedJobId(stream.job._id)}
                     onCancel={isCancellable ? () => setCancelTarget({ jobId: stream.job._id, label: agent.targetSite }) : undefined}
+                    heroIcon={heroIcons[stream.job.type]}
                   />
                 );
               })}
