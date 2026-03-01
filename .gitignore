@@ -1,0 +1,17 @@
+node_modules/
+.env.local
+.env
+.DS_Store
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Convex
+convex/_generated/
+
+# Claude
+.claude/worktrees/
