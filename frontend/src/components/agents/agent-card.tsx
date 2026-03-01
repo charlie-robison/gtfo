@@ -105,7 +105,7 @@ export function AgentCard({ agent, compact, onClick, onCancel, screenshotUrl, he
         <CardContent className="p-1.5 flex flex-col gap-1 flex-1 min-h-0">
           {/* Header row */}
           <div className="flex items-center gap-1.5 px-1 shrink-0">
-            <h3 className="text-[11px] font-semibold truncate">{agent.targetSite}</h3>
+            <h3 className="text-sm font-bold truncate">{agent.targetSite}</h3>
             <span className="text-[10px] text-muted-foreground truncate flex-1">{agent.currentStep}</span>
             <Badge
               variant="outline"
