@@ -182,8 +182,8 @@ export function OnboardingForm() {
             <Input
               id="landlord-email"
               type="email"
-              placeholder="charlierobison480@gmail.com"
-              defaultValue="charlierobison480@gmail.com"
+              placeholder="kaushikskaja@gmail.com"
+              defaultValue="kaushikskaja@gmail.com"
             />
           </div>
 
