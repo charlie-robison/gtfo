@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REDFIN_EMAIL = os.getenv("REDFIN_EMAIL", "")
+AMAZON_EMAIL = os.getenv("AMAZON_EMAIL", "")
+AMAZON_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
 
 
 async def apply_redfin_listing(
@@ -45,48 +46,34 @@ async def apply_redfin_listing(
             f"Please let me know if the unit is still available. Thank you!"
         )
 
-    task = f"""
-Go to {listing_url} and do the following:
+    initial_actions = [
+        {"navigate": {"url": listing_url, "new_tab": False}},
+    ]
 
-IMPORTANT — Human-like pacing (applies throughout the ENTIRE session):
-  - Wait 2–4 seconds between major navigation actions.
-  - Wait 1–2 seconds between filling individual form fields.
-  - If you see any CAPTCHA or "are you a robot?" challenge, wait 10 seconds
-    and then attempt to solve it normally.
+    task = f"""You are on a Redfin rental listing page. Do the following:
 
-STEP 1 — Navigate to the listing:
-1. Navigate to {listing_url} and wait 3–5 seconds for the page to fully load.
-2. Confirm the listing page has loaded (you should see property details,
-   photos, price, etc.).
-
-STEP 2 — Find and open the contact form:
-1. Look for a button or link that says "Send Message", "Contact Property",
-   "Request a Tour", "Email", "Contact Agent", "Apply", or similar.
-2. Click the most relevant contact button.
-3. Wait 2–3 seconds for any form or modal to appear.
-
-STEP 3 — Fill out the contact form (DEMO — DO NOT SUBMIT):
-1. Fill in the fields (1–2 seconds between fields):
-   - Name / First Name / Last Name: {full_name}
-   - Email: use x_redfin_email
+1. Close any overlays/modals (sign-up popups, cookie banners) if present.
+2. Click the contact button ("Send Message", "Contact Property",
+   "Request a Tour", "Email", "Contact Agent", "Apply", or similar)
+   to open the full contact form BEFORE filling anything.
+3. Once the contact form/modal is open, fill ALL fields in one go:
+   - First Name: {full_name.split()[0]}
+   - Last Name: {full_name.split()[-1]}
+   - Email: use x_amazon_email
    - Phone: {phone}
    - Move-in date: {move_in_date}
    - Message: {message}
-   - Fill in any other required fields with reasonable information.
-2. *** STOP HERE — DO NOT click the final submit / send button. ***
-   This is a DEMO. Confirm the form is filled correctly and note that
-   the form was filled but NOT submitted.
+   - Fill any other required fields with reasonable info.
+4. *** STOP — DO NOT click submit/send. This is a DEMO. ***
+5. Report: whether the form was filled, any issues, the listing address and price.
 
-STEP 4 — Report:
-Summarize:
-  - Whether the contact form was found and filled successfully
-  - Any issues encountered (no contact button, CAPTCHA, etc.)
-  - The listing address and price shown on the page
+If you see a CAPTCHA, wait 10 seconds then attempt to solve it.
 """
 
     browser = Browser(
         headless=False,
         keep_alive=True,
+        enable_default_extensions=False,
     )
 
     llm = ChatBrowserUse()
@@ -94,16 +81,20 @@ Summarize:
         task=task,
         llm=llm,
         browser=browser,
+        initial_actions=initial_actions,
         sensitive_data={
-            "x_redfin_email": REDFIN_EMAIL,
+            "x_amazon_email": AMAZON_EMAIL,
+            "x_amazon_pass": AMAZON_PASSWORD,
         },
-        use_vision=True,
+        use_vision=False,
+        max_actions_per_step=10,
+        use_judge=False,
     )
     bg_task = None
     if screenshot_loop:
         bg_task = asyncio.create_task(screenshot_loop(browser))
     try:
-        result = await agent.run()
+        result = await agent.run(max_steps=8)
     finally:
         if bg_task:
             bg_task.cancel()

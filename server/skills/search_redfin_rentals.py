@@ -124,77 +124,54 @@ async def search_redfin_rentals(
     price_slug = _format_price(max_rent)
     filters = f"max-price={price_slug},min-beds={min_bedrooms},min-baths={min_bathrooms}"
 
+    # ── Build initial_actions to skip LLM navigation steps ──
+    # NOTE: navigate and evaluate both have terminates_sequence=True in
+    # browser-use, so only ONE action per initial_actions list actually runs.
     if direct_url:
-        # Autocomplete API worked from Python — skip navigation entirely
-        task = f"""
-Navigate to {direct_url}.
-Once the page loads, run this JavaScript to extract listing data:
-
-```js
-(function() {{
-  const cards = document.querySelectorAll('[class*="HomeCard"], [class*="RentalCard"], [class*="listingCard"], .HomeViews .HomeCardContainer');
-  const results = [];
-  cards.forEach((card, i) => {{
-    if (i >= {max_results}) return;
-    const link = card.querySelector('a[href*="/rental/"], a[href*="redfin.com"]');
-    const img = card.querySelector('img[src*="cdn-redfin"], img[src*="ssl.cdn"]');
-    const priceEl = card.querySelector('[class*="price"], [class*="Price"]');
-    const addrEl = card.querySelector('[class*="address"], [class*="Address"]');
-    results.push({{
-      url: link ? link.href : '',
-      imageUrl: img ? img.src : '',
-      price: priceEl ? priceEl.textContent.trim() : '',
-      address: addrEl ? addrEl.textContent.trim() : ''
-    }});
-  }});
-  return JSON.stringify(results);
-}})()
-```
-
-Use the evaluate action to run the above JavaScript. Then combine the JS results with what you can see on the page to report up to {max_results} listings.
+        # Python autocomplete worked — navigate straight to filtered results
+        initial_actions = [
+            {"navigate": {"url": direct_url, "new_tab": False}},
+        ]
+        max_steps = 5
+        task = f"""You are on a Redfin rental listings page. Extract up to {max_results} listings from the cards visible on the page.
 For each listing provide:
   - name: property name or address
   - address: full street address
   - city: "{city}"
   - description: beds/baths/sqft from the card
-  - imageUrl: the listing photo URL (from JS result or img src on card)
+  - imageUrl: the listing photo URL (img src on card)
   - monthlyRentPrice: rent in dollars (number only)
-  - numBedrooms: number of bedrooms
-  - numBathrooms: number of bathrooms
-  - squareFootage: square footage (0 if unknown)
+  - numBedrooms / numBathrooms / squareFootage (0 if unknown)
   - moveInCost: 0
-  - url: the individual Redfin listing URL (from JS result or href on card)
-Do NOT open individual listing pages.
-"""
+  - url: the Redfin listing URL (href on card)
+Do NOT open individual listing pages."""
     else:
-        # Autocomplete blocked — navigate to redfin.com and use in-browser JS
-        # to resolve the city slug, then navigate to the filtered URL.
+        # Python autocomplete blocked — navigate to redfin.com, then the LLM
+        # runs the autocomplete JS from the browser (same-origin bypasses WAF).
         autocomplete_js = _build_autocomplete_js(city, state)
-        task = f"""
-Step 1: Navigate to https://www.redfin.com and wait for it to load.
-Step 2: Run this JavaScript using the evaluate action to get the city URL path:
+        initial_actions = [
+            {"navigate": {"url": "https://www.redfin.com", "new_tab": False}},
+        ]
+        max_steps = 10
+        task = f"""You are on redfin.com. First, run this JavaScript using evaluate to resolve the city URL:
 ```js
 {autocomplete_js}
 ```
-Step 3: Read window.__cityPath by running: `window.__cityPath`
-  - If it returned a path like "/city/16409/CA/Sacramento", navigate to:
-    https://www.redfin.com{{that_path}}/rentals/filter/{filters}
-  - If it returned empty string, click the Rent tab, type "{city}, {state}" in the search bar, select the city from the dropdown, then set filters: max price ${max_rent:,}, {min_bedrooms}+ beds, {min_bathrooms}+ baths.
-Step 4: Once you are on the filtered rental listings page, extract data for up to {max_results} listings.
+The JS returns a path like "/city/16409/CA/Sacramento". Then navigate to:
+  https://www.redfin.com{{that_path}}/rentals/filter/{filters}
+If the JS returned empty string, use the search bar to search "{city}, {state}" and apply filters: max ${max_rent:,}, {min_bedrooms}+ beds, {min_bathrooms}+ baths.
+Once on the listings page, extract up to {max_results} listings.
 For each listing provide:
-  - name: property name or address on the card
+  - name: property name or address
   - address: full street address
   - city: "{city}"
   - description: beds/baths/sqft from the card
   - imageUrl: the listing photo URL (img src on card)
   - monthlyRentPrice: rent in dollars (number only)
-  - numBedrooms: number of bedrooms
-  - numBathrooms: number of bathrooms
-  - squareFootage: square footage (0 if unknown)
+  - numBedrooms / numBathrooms / squareFootage (0 if unknown)
   - moveInCost: 0
-  - url: the individual Redfin listing URL (the href link on the card)
-Do NOT open individual listing pages — only collect from the search results cards.
-"""
+  - url: the Redfin listing URL (href on card)
+Do NOT open individual listing pages."""
 
     browser = Browser(
         headless=False,
@@ -207,6 +184,7 @@ Do NOT open individual listing pages — only collect from the search results ca
         task=task,
         llm=llm,
         browser=browser,
+        initial_actions=initial_actions,
         use_vision=True,
         max_actions_per_step=10,
         use_judge=False,
@@ -215,7 +193,7 @@ Do NOT open individual listing pages — only collect from the search results ca
     if screenshot_loop:
         bg_task = asyncio.create_task(screenshot_loop(browser))
     try:
-        result = await agent.run(max_steps=15)
+        result = await agent.run(max_steps=max_steps)
     finally:
         if bg_task:
             bg_task.cancel()
@@ -228,7 +206,6 @@ if __name__ == "__main__":
             city="Sacramento",
             state="CA",
             max_rent=2000,
-            max_move_in_cost=4000,
             min_bedrooms=2,
             min_bathrooms=1,
             max_results=5,
