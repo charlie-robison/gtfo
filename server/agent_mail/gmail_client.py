@@ -1,6 +1,7 @@
 """Gmail API OAuth wrapper for reading user's inbox."""
 
 import json
+import threading
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -11,13 +12,14 @@ from .config import GMAIL_CREDENTIALS_JSON, GMAIL_SCOPES, GMAIL_TOKEN_JSON
 
 
 class GmailClient:
-    """Reads the user's Gmail inbox via OAuth (read-only)."""
+    """Reads the user's Gmail inbox via OAuth (read-only). Thread-safe."""
 
     def __init__(self):
-        self.service = self._build_service()
+        self._creds = self._get_credentials()
+        self._local = threading.local()
 
-    def _build_service(self):
-        """Authenticate via OAuth and build the Gmail API service."""
+    def _get_credentials(self) -> Credentials:
+        """Authenticate via OAuth and return credentials."""
         creds = None
 
         # Load token from env var
@@ -39,7 +41,16 @@ class GmailClient:
                 flow = InstalledAppFlow.from_client_config(client_config, GMAIL_SCOPES)
                 creds = flow.run_local_server(port=0)
 
-        return build("gmail", "v1", credentials=creds)
+        return creds
+
+    @property
+    def service(self):
+        """Return a per-thread Gmail API service instance."""
+        svc = getattr(self._local, "service", None)
+        if svc is None:
+            svc = build("gmail", "v1", credentials=self._creds)
+            self._local.service = svc
+        return svc
 
     def get_profile(self) -> str:
         """Return the authenticated user's email address."""

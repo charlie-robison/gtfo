@@ -10,7 +10,6 @@ Usage:
 import argparse
 import json
 
-from .agentmail_client import AgentMailClient
 from .classifier import classify_services
 from .gmail_client import GmailClient
 from .models import ScanResult, UserAddress
@@ -70,11 +69,11 @@ def run_scan():
 
     # Display results
     print("=" * 60)
-    print("DETECTED SERVICES (sorted by priority)")
+    print("DETECTED SERVICES")
     print("=" * 60)
     for i, svc in enumerate(services, 1):
         print(f"\n  {i}. {svc.service_name}")
-        print(f"     Category: {svc.category.value} | Priority: {svc.priority.value}")
+        print(f"     Category: {svc.category.value}")
         print(f"     Emails found: {svc.email_count}")
         print(f"     Sample sender: {svc.sample_sender}")
         if svc.settings_url:
@@ -89,20 +88,11 @@ def run_scan():
         services=services,
     )
 
-    # Send summary via AgentMail
-    print("4. Sending summary email via AgentMail...")
-    try:
-        agent_mail = AgentMailClient()
-        agent_mail.send_scan_summary(user_email, services)
-        print(f"   Summary sent to {user_email}\n")
-    except Exception as e:
-        print(f"   AgentMail send failed (non-blocking): {e}\n")
-
     # Dump JSON
     output_file = "scan_results.json"
     with open(output_file, "w") as f:
         json.dump(scan_result.model_dump(mode="json"), f, indent=2)
-    print(f"5. Full results saved to {output_file}")
+    print(f"4. Full results saved to {output_file}")
 
 
 def run_rental_inquiry(agent_email: str):

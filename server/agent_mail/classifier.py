@@ -1,4 +1,4 @@
-"""Service classification using OpenAI — deduplicates, categorizes, and prioritizes."""
+"""Service classification using OpenAI — deduplicates and categorizes."""
 
 import json
 from collections import defaultdict
@@ -16,7 +16,6 @@ physical address on file.
 For each service, provide:
 - service_name: The human-readable company/service name (e.g., "Amazon", "Chase Bank")
 - category: One of: banking, shopping, subscription, utility, government, medical, insurance, other
-- priority: One of: critical (banking/govt), high (utilities/medical/insurance), medium (shopping), low (subscriptions)
 - settings_url: Best guess at the URL where the user can update their address (or null)
 - needs_address_update: true if this service likely stores a physical address, false for email-only services
 - sample_sender: One example sender email from the data
@@ -100,15 +99,10 @@ def classify_services(raw_hits: list[RawEmailHit]) -> list[DetectedService]:
         except ValueError:
             category = ServiceCategory.OTHER
 
-        try:
-            priority = ServicePriority(svc.get("priority", "low"))
-        except ValueError:
-            priority = ServicePriority.LOW
-
         services.append(DetectedService(
             service_name=svc["service_name"],
             category=category,
-            priority=priority,
+            priority=ServicePriority.MEDIUM,
             detected_from=matched_domains or [svc.get("sample_sender", "unknown")],
             email_count=email_count,
             settings_url=svc.get("settings_url"),
@@ -116,13 +110,6 @@ def classify_services(raw_hits: list[RawEmailHit]) -> list[DetectedService]:
             sample_sender=svc.get("sample_sender", ""),
         ))
 
-    # Sort by priority
-    priority_order = {
-        ServicePriority.CRITICAL: 0,
-        ServicePriority.HIGH: 1,
-        ServicePriority.MEDIUM: 2,
-        ServicePriority.LOW: 3,
-    }
-    services.sort(key=lambda s: priority_order.get(s.priority, 99))
+    services.sort(key=lambda s: s.service_name)
 
     return services

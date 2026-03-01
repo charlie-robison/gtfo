@@ -17,7 +17,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 AGENTMAIL_INBOX_USERNAME = os.getenv("AGENTMAIL_INBOX_USERNAME", "moveflow-scanner")
 
 # OpenAI model
-OPENAI_MODEL = "gpt-4o"
+OPENAI_MODEL = "gpt-5.1"
 
 # Gmail OAuth
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
