@@ -74,6 +74,17 @@ export default defineSchema({
     summary: v.string(),
   }),
 
+  detected_services: defineTable({
+    serviceName: v.string(),
+    category: v.string(),
+    priority: v.string(),
+    detectedFrom: v.array(v.string()),
+    emailCount: v.number(),
+    settingsUrl: v.optional(v.string()),
+    needsAddressUpdate: v.boolean(),
+    sampleSender: v.string(),
+  }),
+
   screenshots: defineTable({
     jobId: v.id("jobs"),
     jobType: v.string(), // search_rentals | order_uhaul | update_address | order_furniture

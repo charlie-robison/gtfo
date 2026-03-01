@@ -5,11 +5,13 @@ Pure skill/agent execution layer. No database operations.
 Convex handles all reads, writes, and job management.
 
 Endpoints:
-  POST /run-search-rentals     — Run Redfin search skill, return parsed listings
-  POST /run-moving-analysis    — Run GPT-4o house analysis + furniture recs
-  POST /run-order-uhaul        — Run U-Haul ordering skill, return parsed result
-  POST /run-update-address     — Run Amazon address update skill
-  POST /run-order-furniture    — Run Amazon furniture cart skill
+  POST /run-search-rentals        — Run Redfin search skill, return parsed listings
+  POST /run-moving-analysis       — Run GPT-4o house analysis + furniture recs
+  POST /run-order-uhaul           — Run U-Haul ordering skill, return parsed result
+  POST /run-update-address        — Run Amazon address update skill
+  POST /run-order-furniture       — Run Amazon furniture cart skill
+  POST /run-determine-addresses   — Scan Gmail for services with stored addresses
+  POST /run-cancel-lease          — Send lease cancellation email via AgentMail
 
 Run:
   cd server && uvicorn main:app --reload
@@ -34,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
 
 from server.utils import parse_redfin_results, parse_uhaul_result
+from server.agent_mail import AgentMailClient, GmailClient, UserAddress, classify_services, scan_emails
 
 app = FastAPI(title="Automovers Skill Runner")
 
@@ -358,5 +361,69 @@ async def run_order_furniture(params: dict):
         )
         return {"summary": str(result)}
 
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-determine-addresses")
+async def run_determine_addresses(params: dict):
+    """Scan Gmail for services that likely store the user's address, classify them."""
+    old_address = None
+    if params.get("oldStreet"):
+        old_address = UserAddress(
+            street=params["oldStreet"],
+            city=params.get("oldCity", ""),
+            state=params.get("oldState", ""),
+            zip_code=params.get("oldZipCode", ""),
+        )
+
+    try:
+        # Gmail client + scanning are synchronous — run in a thread
+        loop = asyncio.get_event_loop()
+        gmail = await loop.run_in_executor(None, GmailClient)
+        user_email = await loop.run_in_executor(None, gmail.get_profile)
+
+        raw_hits, total = await loop.run_in_executor(
+            None, lambda: scan_emails(gmail, old_address=old_address)
+        )
+
+        if not raw_hits:
+            return {"services": [], "userEmail": user_email, "totalScanned": total}
+
+        services = await loop.run_in_executor(None, classify_services, raw_hits)
+
+        return {
+            "services": [svc.model_dump(mode="json") for svc in services],
+            "userEmail": user_email,
+            "totalScanned": total,
+        }
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}", "services": []}
+
+
+@app.post("/run-cancel-lease")
+async def run_cancel_lease(params: dict):
+    """Send a lease cancellation email via AgentMail."""
+    try:
+        loop = asyncio.get_event_loop()
+
+        def _send():
+            client = AgentMailClient()
+            client.send_lease_cancellation(
+                to_email=params["landlordEmail"],
+                tenant_name=params["tenantName"],
+                current_address=params["currentAddress"],
+                lease_end_date=params["leaseEndDate"],
+                move_out_date=params["moveOutDate"],
+                reason=params.get("reason", "I am relocating."),
+            )
+            return client.get_or_create_inbox()
+
+        inbox = await loop.run_in_executor(None, _send)
+
+        return {
+            "message": f"Lease cancellation sent to {params['landlordEmail']}",
+            "sentFrom": inbox,
+        }
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}

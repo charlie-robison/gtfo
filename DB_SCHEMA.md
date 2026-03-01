@@ -10,7 +10,7 @@ Tracks every background task dispatched to FastAPI. Each skill execution (rental
 
 | Field | Type | Description |
 |-------|------|-------------|
-| type | string | The kind of skill being run. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`. |
+| type | string | The kind of skill being run. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`, `determine_addresses`, `cancel_lease`. |
 | status | string | Current lifecycle state. One of: `pending` (created, not yet started), `running` (skill is executing), `completed` (finished successfully), `failed` (error occurred). |
 | params | any | The input parameters passed to the skill. Shape varies by job type. |
 | result | any? | The output returned by the skill on success. `undefined` while pending/running. Shape varies by job type. |
@@ -18,7 +18,7 @@ Tracks every background task dispatched to FastAPI. Each skill execution (rental
 | browserUseExternalId | string? | External session ID from the Browser Use API. Used to track/resume browser automation sessions. |
 | browserUseTaskId | string? | Internal task ID from the Browser Use component. Used for cleanup and status tracking. |
 
-**Written by:** `POST /search-rentals`, `POST /moving-pipeline`, `POST /update-address`, `POST /order-furniture`
+**Written by:** `POST /search-rentals`, `POST /moving-pipeline`, `POST /update-address`, `POST /order-furniture`, `POST /cancel-current-lease`
 
 **Read by:** `GET /jobs`, `GET /jobs?job_id=...`
 
@@ -156,6 +156,27 @@ Summary of the Amazon cart after the furniture ordering browser agent runs. Cont
 
 ---
 
+## detected_services
+
+Services detected by scanning the user's Gmail inbox. Each record is a service (e.g. Amazon, Chase Bank, PG&E) that likely has the user's physical address on file and may need updating after a move.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| serviceName | string | Human-readable company/service name (e.g. `"Amazon"`, `"Chase Bank"`). |
+| category | string | Service category. One of: `banking`, `shopping`, `subscription`, `utility`, `government`, `medical`, `insurance`, `other`. |
+| priority | string | How urgently the address should be updated. One of: `critical` (banking/govt), `high` (utilities/medical/insurance), `medium` (shopping), `low` (subscriptions). |
+| detectedFrom | string[] | Email domains that were matched to this service (e.g. `["amazon.com"]`). |
+| emailCount | number | Number of emails found from this service. |
+| settingsUrl | string? | Best-guess URL where the user can update their address (e.g. `"https://www.amazon.com/a/addresses"`). |
+| needsAddressUpdate | boolean | Whether this service likely stores a physical address that needs updating. |
+| sampleSender | string | One example sender email from the scan (e.g. `"ship-confirm@amazon.com"`). |
+
+**Written by:** `POST /determine-addresses`
+
+**Read by:** Returned directly in the `POST /determine-addresses` response.
+
+---
+
 ## screenshots
 
 Screenshots captured during browser-use skill sessions. Each row stores metadata about one screenshot along with a reference to the image stored in Convex file storage. Images are stored as PNGs via `ctx.storage.store()` since they can exceed the 1MB Convex document limit.
@@ -163,7 +184,7 @@ Screenshots captured during browser-use skill sessions. Each row stores metadata
 | Field | Type | Description |
 |-------|------|-------------|
 | jobId | id (jobs) | Reference to the job that produced this screenshot. |
-| jobType | string | The kind of skill that was running. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`. |
+| jobType | string | The kind of skill that was running. One of: `search_rentals`, `order_uhaul`, `update_address`, `order_furniture`, `determine_addresses`, `cancel_lease`. |
 | stepNumber | number | Zero-indexed step number in the agent's action history. |
 | pageUrl | string | The URL the browser was visiting when the screenshot was taken. |
 | pageTitle | string | The page title at the time the screenshot was taken. |

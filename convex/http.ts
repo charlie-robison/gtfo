@@ -184,12 +184,32 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /cancel-current-lease (TODO) ───────────────────────────
+// ── POST /cancel-current-lease ───────────────────────────────────
 
 http.route({
   path: "/cancel-current-lease",
   method: "POST",
-  handler: httpAction(async () => jsonResponse(null)),
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    const params = {
+      landlordEmail: body.landlord_email,
+      tenantName: body.tenant_name,
+      currentAddress: body.current_address,
+      leaseEndDate: body.lease_end_date,
+      moveOutDate: body.move_out_date,
+      reason: body.reason ?? "I am relocating.",
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "cancel_lease",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runCancelLease, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
 });
 
 http.route({
@@ -198,12 +218,30 @@ http.route({
   handler: httpAction(async () => corsPreflightResponse()),
 });
 
-// ── POST /determine-addresses (TODO) ────────────────────────────
+// ── POST /determine-addresses ────────────────────────────────────
 
 http.route({
   path: "/determine-addresses",
   method: "POST",
-  handler: httpAction(async () => jsonResponse(null)),
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+
+    const params = {
+      oldStreet: body.old_street ?? "",
+      oldCity: body.old_city ?? "",
+      oldState: body.old_state ?? "",
+      oldZipCode: body.old_zip_code ?? "",
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "determine_addresses",
+      params,
+    });
+
+    await ctx.scheduler.runAfter(0, api.actions.runDetermineAddresses, { jobId, params });
+
+    return jsonResponse({ job_id: jobId });
+  }),
 });
 
 http.route({

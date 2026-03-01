@@ -157,13 +157,88 @@ Order all recommended furniture on Amazon. Reads items from Convex DB (run `/mov
 
 ---
 
-### POST /cancel-current-lease
-
-**Not yet implemented.** Returns `null`.
-
 ### POST /determine-addresses
 
-**Not yet implemented.** Returns `null`.
+Scan the user's Gmail inbox for services that likely store their physical address, classify them with GPT-4o, and return the results. Runs synchronously — the response contains the detected services.
+
+**Input:**
+
+```json
+{
+  "old_street": "5122 Mertola Drive",
+  "old_city": "El Dorado Hills",
+  "old_state": "CA",
+  "old_zip_code": "95762"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| old_street | string | no | "" | Current street address (improves search accuracy) |
+| old_city | string | no | "" | Current city |
+| old_state | string | no | "" | Current state |
+| old_zip_code | string | no | "" | Current ZIP code |
+
+**Output:**
+
+```json
+{
+  "services": [
+    {
+      "service_name": "Amazon",
+      "category": "shopping",
+      "priority": "medium",
+      "detected_from": ["amazon.com"],
+      "email_count": 42,
+      "settings_url": "https://www.amazon.com/a/addresses",
+      "needs_address_update": true,
+      "sample_sender": "ship-confirm@amazon.com"
+    }
+  ],
+  "userEmail": "user@gmail.com",
+  "totalScanned": 150
+}
+```
+
+**Side effects:** Writes each detected service to `detected_services`.
+
+---
+
+### POST /cancel-current-lease
+
+Send a lease cancellation / notice to vacate email to the current landlord via AgentMail. Creates a background job.
+
+**Input:**
+
+```json
+{
+  "landlord_email": "landlord@example.com",
+  "tenant_name": "John Doe",
+  "current_address": "123 Main St, Sacramento, CA 95814",
+  "lease_end_date": "June 30, 2026",
+  "move_out_date": "June 30, 2026",
+  "reason": "I am relocating."
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| landlord_email | string | yes | — | Landlord's email address |
+| tenant_name | string | yes | — | Tenant's full name |
+| current_address | string | yes | — | Current rental address |
+| lease_end_date | string | yes | — | Lease end date |
+| move_out_date | string | yes | — | Intended move-out date |
+| reason | string | no | "I am relocating." | Reason for leaving |
+
+**Output:**
+
+```json
+{ "job_id": "jd7..." }
+```
+
+**Side effects:** Creates a `cancel_lease` job. Background action sends the email via AgentMail and completes the job with `{ message, sentFrom }`.
+
+---
 
 ### POST /setup-utilities
 
@@ -219,7 +294,7 @@ List all background jobs, or get one by ID.
 
 | Field | Type | Values |
 |-------|------|--------|
-| type | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` |
+| type | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` \| `determine_addresses` \| `cancel_lease` |
 | status | string | `pending` \| `running` \| `completed` \| `failed` |
 
 ---
@@ -381,8 +456,8 @@ List all Amazon order summaries from furniture ordering.
 | POST | `/moving-pipeline` | Analyze house + furniture recs + schedule U-Haul |
 | POST | `/update-address` | Update Amazon delivery address |
 | POST | `/order-furniture` | Order recommended furniture on Amazon |
-| POST | `/cancel-current-lease` | Cancel current lease (TODO) |
-| POST | `/determine-addresses` | Determine addresses (TODO) |
+| POST | `/determine-addresses` | Scan Gmail for services with stored addresses |
+| POST | `/cancel-current-lease` | Send lease cancellation email to landlord |
 | POST | `/setup-utilities` | Set up utilities (TODO) |
 | GET | `/jobs` | List all jobs or get one by `?job_id=` |
 | GET | `/steps` | List all pipeline steps |
@@ -429,3 +504,5 @@ Called by Convex actions only. Not for direct client use.
 | `POST /run-order-uhaul` | Run U-Haul browser agent, return parsed result |
 | `POST /run-update-address` | Run Amazon address update browser agent |
 | `POST /run-order-furniture` | Run Amazon furniture cart browser agent |
+| `POST /run-determine-addresses` | Scan Gmail, classify services with stored addresses |
+| `POST /run-cancel-lease` | Send lease cancellation email via AgentMail |

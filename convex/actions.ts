@@ -204,6 +204,114 @@ export const runOrderFurniture = action({
   },
 });
 
+// ── Determine Addresses (email scan + classification) ───────────
+
+export const runDetermineAddresses = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      const resp = await fetch(`${getFastapiUrl()}/run-determine-addresses`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify(params),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
+
+      const result = await resp.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      const services = result.services ?? [];
+
+      for (const svc of services) {
+        await ctx.runMutation(api.mutations.insertDetectedService, {
+          serviceName: svc.service_name ?? "",
+          category: svc.category ?? "other",
+          priority: svc.priority ?? "low",
+          detectedFrom: svc.detected_from ?? [],
+          emailCount: svc.email_count ?? 0,
+          settingsUrl: svc.settings_url ?? undefined,
+          needsAddressUpdate: svc.needs_address_update ?? true,
+          sampleSender: svc.sample_sender ?? "",
+        });
+      }
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: {
+          services,
+          userEmail: result.userEmail ?? "",
+          totalScanned: result.totalScanned ?? 0,
+        },
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
+// ── Cancel Current Lease ────────────────────────────────────────
+
+export const runCancelLease = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      const resp = await fetch(`${getFastapiUrl()}/run-cancel-lease`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify(params),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
+
+      const result = await resp.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: {
+          message: result.message ?? "Lease cancellation sent",
+          sentFrom: result.sentFrom ?? "",
+        },
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
 // ── Moving Pipeline (house analysis + furniture recs) ───────────
 
 export const runMovingAnalysis = action({

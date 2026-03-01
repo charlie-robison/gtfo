@@ -142,6 +142,22 @@ export const insertAmazonOrderSummary = mutation({
   },
 });
 
+export const insertDetectedService = mutation({
+  args: {
+    serviceName: v.string(),
+    category: v.string(),
+    priority: v.string(),
+    detectedFrom: v.array(v.string()),
+    emailCount: v.number(),
+    settingsUrl: v.optional(v.string()),
+    needsAddressUpdate: v.boolean(),
+    sampleSender: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("detected_services", args);
+  },
+});
+
 export const insertScreenshot = mutation({
   args: {
     jobId: v.id("jobs"),
