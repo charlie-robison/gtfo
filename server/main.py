@@ -37,7 +37,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from server.utils import parse_redfin_results, parse_uhaul_result
-from server.agent_mail import AgentMailClient, GmailClient, UserAddress, classify_services, scan_emails
+from server.agent_mail import GmailClient, UserAddress, classify_services, scan_emails
 
 CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
 
@@ -477,6 +477,8 @@ async def run_determine_addresses(params: dict):
 async def run_cancel_lease(params: dict):
     """Send a lease cancellation email via AgentMail."""
     try:
+        from server.agent_mail import AgentMailClient
+
         loop = asyncio.get_event_loop()
 
         def _send():
