@@ -8,6 +8,7 @@ the payment / credit-card step.
 
 import asyncio
 import os
+from pathlib import Path
 from browser_use import Agent, Browser, ChatBrowserUse
 from dotenv import load_dotenv
 
@@ -15,6 +16,9 @@ load_dotenv()
 
 UHAUL_EMAIL = os.getenv("AMAZON_EMAIL", "")
 UHAUL_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
+
+# Persistent browser profile directory — preserves cookies/login state across runs
+UHAUL_PROFILE_DIR = str(Path(__file__).resolve().parent.parent / "profiles" / "uhaul")
 
 
 async def order_uhaul(
@@ -65,21 +69,27 @@ async def order_uhaul(
         step6_labor = ""
 
     task = f"""
-Go to https://www.uhaul.com and do the following:
+You have two tabs already open:
+  - Tab 1: https://www.uhaul.com (U-Haul homepage)
+  - Tab 2: https://mail.google.com/ (Gmail — for OTP codes if needed)
 
-STEP 1 — Sign in:
-1. Look for a "Sign In" link or button (usually in the top-right header area) and click it.
-2. Enter email x_uhaul_email and password x_uhaul_pass to sign in.
-3. If a CAPTCHA or verification appears that you cannot solve, wait a moment and try again.
-4. If a One-Time Password (OTP) / verification code screen appears, do the following:
-   a. Open a NEW TAB and go to https://mail.google.com/
+Start on Tab 1 (the U-Haul tab).
+
+STEP 1 — Sign in (skip if already signed in):
+1. First, check if you are ALREADY signed in — look for a greeting, account icon, "My Account", or your name in the header.
+   - If you ARE already signed in, skip directly to STEP 2.
+2. If NOT signed in, look for a "Sign In" link or button (usually in the top-right header area) and click it.
+3. Enter email x_uhaul_email and password x_uhaul_pass to sign in.
+4. If a CAPTCHA or verification appears that you cannot solve, wait a moment and try again.
+5. If a One-Time Password (OTP) / verification code screen appears, do the following:
+   a. Switch to Tab 2 (Gmail tab — it should already be open).
    b. If prompted to sign in to Gmail, enter email x_uhaul_email, click Next, then enter password x_uhaul_pass, and click Next.
    c. Once in the inbox, look for the most recent email from U-Haul (sender may contain "uhaul" or "U-Haul"). Open it.
    d. Find the one-time password / verification code in the email body. It is usually a 6-digit number.
    e. Copy or remember that code.
-   f. Switch back to the U-Haul tab (the first tab).
+   f. Switch back to Tab 1 (the U-Haul tab).
    g. Enter the OTP code into the verification field and submit it.
-5. Confirm you are signed in (look for a greeting, account icon, or "My Account" link).
+6. Confirm you are signed in (look for a greeting, account icon, or "My Account" link).
 
 STEP 2 — Start a reservation:
 1. On the homepage (or navigate back to it), find the reservation / quote form.
@@ -117,10 +127,16 @@ STEP 6 — STOP before payment:
     browser = Browser(
         headless=False,
         keep_alive=True,
+        user_data_dir=UHAUL_PROFILE_DIR,
         args=[
             "--disable-features=AutofillServerCommunication",
             "--disable-save-password-bubble",
             "--password-store=basic",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--disable-translate",
+            "--no-first-run",
         ],
     )
 
@@ -133,6 +149,16 @@ STEP 6 — STOP before payment:
             window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
         }
     """)
+
+    # Pre-open both tabs so pages load while the agent initializes
+    uhaul_page = await browser.get_current_page()
+    if uhaul_page:
+        await uhaul_page.goto("https://www.uhaul.com")
+    else:
+        uhaul_page = await browser.new_page("https://www.uhaul.com")
+    await browser.new_page("https://mail.google.com/")
+    # Set agent focus back to the U-Haul tab
+    browser.agent_focus_target_id = uhaul_page._target_id
 
     llm = ChatBrowserUse()
     agent = Agent(
