@@ -56,7 +56,7 @@ export default defineSchema({
     url: v.string(),
     applicationStatus: v.string(), // found | applying | applied | failed
     applyJobId: v.optional(v.id("jobs")),
-  }),
+  }).index("by_url", ["url"]),
 
   uhaul_information: defineTable({
     vehicle: v.string(),

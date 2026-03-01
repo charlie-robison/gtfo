@@ -116,6 +116,14 @@ export const insertRedfinApplication = mutation({
     applyJobId: v.optional(v.id("jobs")),
   },
   handler: async (ctx, args) => {
+    // Skip duplicate listings — check if URL already exists
+    if (args.url) {
+      const existing = await ctx.db
+        .query("redfin_applications")
+        .withIndex("by_url", (q) => q.eq("url", args.url))
+        .first();
+      if (existing) return existing._id;
+    }
     return await ctx.db.insert("redfin_applications", args);
   },
 });

@@ -111,12 +111,14 @@ def _build_extract_listings_js(max_results: int, city: str) -> str:
             '.HomeCardContainer, .MapHomeCardReact, .RentalHomeCard, [data-rf-test-id="mapHomeCard"]'
         );
         const results = [];
+        const seenUrls = new Set();
         for (const card of cards) {
             if (results.length >= """ + str(max_results) + """) break;
             const linkEl = card.querySelector('a[href*="/rental/"], a[href*="/apartment/"], a.link-and-anchor');
             const href = linkEl ? linkEl.getAttribute('href') : '';
             const url = href.startsWith('http') ? href : (href ? 'https://www.redfin.com' + href : '');
-            if (!url) continue;
+            if (!url || seenUrls.has(url)) continue;
+            seenUrls.add(url);
 
             const priceEl = card.querySelector('.homecardV2Price, .HomeCardContainer--price, [data-rf-test-id="homecard-price"]');
             const priceText = priceEl ? priceEl.textContent.replace(/[^0-9]/g, '') : '0';
