@@ -116,13 +116,20 @@ def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
         try:
             while True:
                 try:
-                    page = await browser.get_current_page()
+                    # Use get_pages() instead of get_current_page() to avoid
+                    # the aggressive recovery logic that can crash the session.
+                    pages = await browser.get_pages()
+                    page = pages[-1] if pages else None
                     if page:
                         screenshot_b64 = await page.screenshot()
-                        url = page.url if hasattr(page, "url") else ""
+                        url = ""
+                        try:
+                            url = await page.get_url()
+                        except Exception:
+                            pass
                         title = ""
                         try:
-                            title = await page.title() if callable(getattr(page, "title", None)) else ""
+                            title = await page.get_title()
                         except Exception:
                             pass
                         # Shield upload from cancellation so it always completes
