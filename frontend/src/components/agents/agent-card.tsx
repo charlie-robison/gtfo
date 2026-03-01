@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AgentSession, AgentStatus } from "@/types";
 import { AgentScreenshot } from "./agent-screenshot";
 import { cn } from "@/lib/utils";
-import { Check, Loader2, AlertTriangle, XCircle, Ban } from "lucide-react";
+import { Check, Loader2, AlertTriangle, XCircle, Ban, type LucideIcon } from "lucide-react";
 
 const statusConfig: Record<
   AgentStatus,
@@ -83,9 +83,11 @@ interface AgentCardProps {
   onClick?: () => void;
   onCancel?: () => void;
   screenshotUrl?: string | null;
+  /** When set, replaces the screenshot area with a prominent icon + label display. */
+  heroIcon?: LucideIcon;
 }
 
-export function AgentCard({ agent, compact, onClick, onCancel, screenshotUrl }: AgentCardProps) {
+export function AgentCard({ agent, compact, onClick, onCancel, screenshotUrl, heroIcon: HeroIcon }: AgentCardProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
 
@@ -135,8 +137,19 @@ export function AgentCard({ agent, compact, onClick, onCancel, screenshotUrl }: 
               </Button>
             )}
           </div>
-          {/* Live screenshot — fills remaining space */}
-          <AgentScreenshot url={agentUrl} status={agent.status} compact screenshotUrl={screenshotUrl} />
+          {/* Live screenshot or hero display */}
+          {HeroIcon ? (
+            <div className="flex-1 min-h-0 rounded overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col items-center justify-center gap-2">
+              <HeroIcon className={cn(
+                "w-10 h-10 text-emerald-500/60",
+                (agent.status === "running" || agent.status === "initializing") && "animate-pulse"
+              )} />
+              <p className="text-sm font-semibold text-zinc-300">{agent.targetSite}</p>
+              <p className="text-[10px] text-zinc-500">{agent.currentStep}</p>
+            </div>
+          ) : (
+            <AgentScreenshot url={agentUrl} status={agent.status} compact screenshotUrl={screenshotUrl} />
+          )}
         </CardContent>
       </Card>
     );
