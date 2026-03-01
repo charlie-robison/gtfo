@@ -141,13 +141,20 @@ export interface HouseInformation {
 
 export interface RedfinApplication {
   _id: string;
+  _creationTime: number;
+  name: string;
   address: string;
+  city: string;
+  description: string;
+  imageUrl: string;
   monthlyRentPrice: number;
   numBedrooms: number;
   numBathrooms: number;
   squareFootage: number;
   moveInCost: number;
   url: string;
+  applicationStatus: string;
+  applyJobId?: string;
 }
 
 export interface UhaulInformation {

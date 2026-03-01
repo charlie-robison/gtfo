@@ -47,16 +47,51 @@ export const runSearchRentals = action({
       const result = await resp.json();
       const listings = result.listings ?? [];
 
+      // Save each listing as a redfin_application with full details
       for (const listing of listings) {
-        await ctx.runMutation(api.mutations.insertRedfinApplication, {
+        const applicationId = await ctx.runMutation(api.mutations.insertRedfinApplication, {
+          name: listing.name ?? "",
           address: listing.address ?? "",
+          city: listing.city ?? params.city ?? "",
+          description: listing.description ?? "",
+          imageUrl: listing.imageUrl ?? listing.image_url ?? "",
           monthlyRentPrice: listing.monthly_rent_price ?? listing.monthlyRentPrice ?? 0,
           numBedrooms: listing.num_bedrooms ?? listing.numBedrooms ?? 0,
           numBathrooms: listing.num_bathrooms ?? listing.numBathrooms ?? 0,
           squareFootage: listing.square_footage ?? listing.squareFootage ?? 0,
           moveInCost: listing.move_in_cost ?? listing.moveInCost ?? 0,
           url: listing.url ?? "",
+          applicationStatus: "found",
         });
+
+        // Create a separate apply job for each listing
+        if (listing.url) {
+          const applyParams = {
+            listingUrl: listing.url,
+            fullName: params.fullName,
+            phone: params.phone,
+            moveInDate: params.moveInDate,
+            applicationId,
+          };
+
+          const applyJobId = await ctx.runMutation(api.mutations.createJob, {
+            type: "apply_redfin",
+            params: applyParams,
+          });
+
+          // Link the apply job to the application
+          await ctx.runMutation(api.mutations.updateRedfinApplicationStatus, {
+            applicationId,
+            applicationStatus: "applying",
+            applyJobId: applyJobId,
+          });
+
+          // Schedule the apply action in background
+          await ctx.scheduler.runAfter(0, api.actions.runApplyRedfin, {
+            jobId: applyJobId,
+            params: applyParams,
+          });
+        }
       }
 
       await ctx.runMutation(api.mutations.completeJob, {
@@ -64,6 +99,65 @@ export const runSearchRentals = action({
         result: { listingsCount: listings.length },
       });
     } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId,
+        errorMessage: e.message ?? String(e),
+      });
+    }
+  },
+});
+
+// ── Apply to Single Redfin Listing ─────────────────────────────
+
+export const runApplyRedfin = action({
+  args: {
+    jobId: v.id("jobs"),
+    params: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { jobId, params } = args;
+
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId, status: "running" });
+
+    try {
+      const resp = await fetch(`${getFastapiUrl()}/run-apply-redfin`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify({ ...params, jobId, jobType: "apply_redfin" }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
+
+      const result = await resp.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Update the redfin_application status to applied
+      if (params.applicationId) {
+        await ctx.runMutation(api.mutations.updateRedfinApplicationStatus, {
+          applicationId: params.applicationId,
+          applicationStatus: "applied",
+        });
+      }
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId,
+        result: result.message ?? "Applied to listing!",
+      });
+    } catch (e: any) {
+      // Update the redfin_application status to failed
+      if (params.applicationId) {
+        await ctx.runMutation(api.mutations.updateRedfinApplicationStatus, {
+          applicationId: params.applicationId,
+          applicationStatus: "failed",
+        });
+      }
+
       await ctx.runMutation(api.mutations.failJob, {
         jobId,
         errorMessage: e.message ?? String(e),

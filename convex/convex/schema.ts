@@ -43,13 +43,19 @@ export default defineSchema({
   }),
 
   redfin_applications: defineTable({
+    name: v.string(),
     address: v.string(),
+    city: v.string(),
+    description: v.string(),
+    imageUrl: v.string(),
     monthlyRentPrice: v.number(),
     numBedrooms: v.number(),
     numBathrooms: v.number(),
     squareFootage: v.number(),
     moveInCost: v.number(),
     url: v.string(),
+    applicationStatus: v.string(), // found | applying | applied | failed
+    applyJobId: v.optional(v.id("jobs")),
   }),
 
   uhaul_information: defineTable({

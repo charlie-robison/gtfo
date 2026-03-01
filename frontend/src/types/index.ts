@@ -25,7 +25,25 @@ export interface User {
 
 // Phase 1 — Apartment Search
 export type ListingSource = "redfin" | "zillow" | "apartments.com";
-export type ApplicationStatus = "found" | "applying" | "applied" | "accepted" | "rejected";
+export type ApplicationStatus = "found" | "applying" | "applied" | "failed";
+
+export interface RedfinApplication {
+  _id: string;
+  _creationTime: number;
+  name: string;
+  address: string;
+  city: string;
+  description: string;
+  imageUrl: string;
+  monthlyRentPrice: number;
+  numBedrooms: number;
+  numBathrooms: number;
+  squareFootage: number;
+  moveInCost: number;
+  url: string;
+  applicationStatus: ApplicationStatus;
+  applyJobId?: string;
+}
 
 export interface Listing {
   id: string;

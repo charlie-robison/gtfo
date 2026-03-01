@@ -5,7 +5,8 @@ Pure skill/agent execution layer. No database operations.
 Convex handles all reads, writes, and job management.
 
 Endpoints:
-  POST /run-search-rentals           — Run Redfin search skill, return parsed listings
+  POST /run-search-rentals           — Search Redfin for rentals, return parsed listings
+  POST /run-apply-redfin             — Apply to a single Redfin listing (browser-use)
   POST /run-moving-analysis          — Run GPT-4o house analysis + furniture recs
   POST /run-order-uhaul              — Run U-Haul ordering skill, return parsed result
   POST /run-update-amazon-address    — Run Amazon address update skill
@@ -135,21 +136,18 @@ def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
 
 @app.post("/run-search-rentals")
 async def run_search_rentals(params: dict):
-    """Run the Redfin search skill and return parsed listings."""
-    from server.skills.search_redfin_rentals import search_and_contact_redfin_rentals
+    """Run the Redfin search skill and return parsed listings with full details."""
+    from server.skills.search_redfin_rentals import search_redfin_rentals
 
     job_id = params.get("jobId", "")
     job_type = params.get("jobType", "search_rentals")
     loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
-        result = await search_and_contact_redfin_rentals(
+        result = await search_redfin_rentals(
             city=params["city"],
             state=params["state"],
             max_rent=params["maxRent"],
-            full_name=params["fullName"],
-            phone=params["phone"],
-            move_in_date=params["moveInDate"],
             min_bedrooms=params.get("minBedrooms", 1),
             min_bathrooms=params.get("minBathrooms", 1),
             max_results=params.get("maxResults", 5),
@@ -162,6 +160,29 @@ async def run_search_rentals(params: dict):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "listings": []}
+
+
+@app.post("/run-apply-redfin")
+async def run_apply_redfin(params: dict):
+    """Run the Redfin apply skill for a single listing."""
+    from server.skills.apply_redfin_listing import apply_redfin_listing
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "apply_redfin")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
+    try:
+        result = await apply_redfin_listing(
+            listing_url=params["listingUrl"],
+            full_name=params["fullName"],
+            phone=params["phone"],
+            move_in_date=params["moveInDate"],
+            screenshot_loop=loop,
+        )
+        return {"message": f"Applied to listing: {params['listingUrl']}", "result": str(result)}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 @app.post("/run-moving-analysis")

@@ -22,20 +22,27 @@ def parse_redfin_results(agent_result: str) -> list[dict]:
     """Extract structured listing data from the Redfin agent's free-text output.
 
     Returns a list of dicts, each with:
-        address, monthlyRentPrice, numBedrooms, numBathrooms,
+        name, address, city, description, imageUrl,
+        monthlyRentPrice, numBedrooms, numBathrooms,
         squareFootage, moveInCost, url
     """
     response = _get_client().chat.completions.create(
         model="gpt-4o",
-        max_tokens=2048,
+        max_tokens=4096,
         messages=[
             {
                 "role": "system",
                 "content": (
                     "You extract structured rental listing data from browser agent output. "
                     "Return ONLY a JSON array of objects. Each object must have exactly these keys: "
-                    "address (string), monthlyRentPrice (number), numBedrooms (number), "
-                    "numBathrooms (number), squareFootage (number), moveInCost (number), url (string). "
+                    "name (string - property name/title), "
+                    "address (string - full street address), "
+                    "city (string - city name), "
+                    "description (string - property description, first 500 chars), "
+                    "imageUrl (string - URL of the main listing photo), "
+                    "monthlyRentPrice (number), numBedrooms (number), "
+                    "numBathrooms (number), squareFootage (number), moveInCost (number), "
+                    "url (string - full Redfin listing URL). "
                     "If a value is unknown, use 0 for numbers and empty string for strings. "
                     "No markdown fences, no extra text."
                 ),
