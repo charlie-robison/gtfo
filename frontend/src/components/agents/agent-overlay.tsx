@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { AgentSession, AgentStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { X, Check, Clock, Loader2, AlertTriangle, XCircle, Monitor } from "lucide-react";
+import { getScreenshotsByJobId, type Screenshot } from "@/lib/endpoints";
 
 const statusConfig: Record<
   AgentStatus,
@@ -37,84 +39,6 @@ const statusConfig: Record<
   },
 };
 
-const siteUrls: Record<string, string> = {
-  "Bank of America": "https://bankofamerica.com/profile/settings",
-  "Robinhood": "https://robinhood.com/account/personal-info",
-  "UBS": "https://ubs.com/profile/address",
-  "Venmo": "https://venmo.com/account/settings",
-  "Tesla": "https://tesla.com/account/profile",
-  "Amazon": "https://amazon.com/addresses",
-  "Chase": "https://chase.com/personal/profile",
-  "Wells Fargo": "https://wellsfargo.com/myaccount/address",
-  "Fidelity": "https://fidelity.com/account/profile",
-  "Netflix": "https://netflix.com/account/billing",
-  "Spotify": "https://spotify.com/account/profile",
-  "Citi": "https://online.citi.com/profile/settings",
-  "Progressive": "https://progressive.com/myaccount/policy",
-  "USPS": "https://moversguide.usps.com/mgo",
-  "DMV": "https://dmv.ca.gov/online/address-change",
-  "Kaiser Permanente": "https://healthy.kaiserpermanente.org/profile",
-  "State Farm": "https://statefarm.com/account/profile",
-  "Verizon": "https://verizon.com/myaccount/profile",
-  "Comcast": "https://xfinity.com/myaccount/settings",
-  "PG&E": "https://pge.com/myaccount/service",
-  "American Express": "https://americanexpress.com/account/settings",
-  "DoorDash": "https://doordash.com/consumer/account",
-  "Uber": "https://riders.uber.com/settings",
-  "Target": "https://target.com/account/addresses",
-  "Walmart": "https://walmart.com/account/addresses",
-  "Apple": "https://appleid.apple.com/account/manage",
-  "Google": "https://myaccount.google.com/address",
-  "PayPal": "https://paypal.com/myaccount/settings/address",
-  "Schwab": "https://schwab.com/client-home/profile",
-  "IRS": "https://irs.gov/forms/form-8822",
-};
-
-function generateSnapshots(agent: AgentSession) {
-  const domain = agent.targetSite.toLowerCase().replace(/\s+/g, "");
-  const base = [
-    { label: "Login page", url: `https://${domain}.com/login`, time: "0:03" },
-    { label: "Entering credentials", url: `https://${domain}.com/login`, time: "0:08" },
-  ];
-
-  if (agent.status === "failed") {
-    return [
-      ...base,
-      { label: "Submitting login", url: `https://${domain}.com/login`, time: "0:12" },
-      { label: "Security challenge", url: `https://${domain}.com/verify`, time: "0:18" },
-      { label: "Blocked — manual required", url: `https://${domain}.com/verify`, time: "0:25" },
-    ];
-  }
-
-  const loggedIn = [
-    ...base,
-    { label: "Logged in — home", url: `https://${domain}.com/dashboard`, time: "0:12" },
-    { label: "Navigating to settings", url: `https://${domain}.com/settings`, time: "0:18" },
-    { label: "Found profile page", url: `https://${domain}.com/settings/profile`, time: "0:24" },
-    { label: "Address section located", url: `https://${domain}.com/settings/address`, time: "0:30" },
-    { label: "Clicking edit", url: `https://${domain}.com/settings/address?edit=1`, time: "0:35" },
-    { label: "Clearing old address", url: `https://${domain}.com/settings/address?edit=1`, time: "0:40" },
-    { label: "Typing new address", url: `https://${domain}.com/settings/address?edit=1`, time: "0:45" },
-  ];
-
-  if (agent.status === "waiting_approval") {
-    return [
-      ...loggedIn,
-      { label: "Form filled — awaiting approval", url: `https://${domain}.com/settings/address?edit=1`, time: "0:52" },
-    ];
-  }
-
-  if (agent.status === "completed") {
-    return [
-      ...loggedIn,
-      { label: "Submitting change", url: `https://${domain}.com/settings/address?edit=1`, time: "0:52" },
-      { label: "Address confirmed", url: `https://${domain}.com/settings/address`, time: "0:56" },
-    ];
-  }
-
-  return loggedIn;
-}
-
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -129,8 +53,46 @@ interface AgentOverlayProps {
 export function AgentOverlay({ agent, onClose }: AgentOverlayProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
-  const agentUrl = siteUrls[agent.targetSite] || `https://${agent.targetSite.toLowerCase().replace(/\s+/g, "")}.com`;
-  const snapshots = generateSnapshots(agent);
+  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Poll screenshots for this job every 500 ms
+  useEffect(() => {
+    let active = true;
+
+    async function poll() {
+      try {
+        const data = await getScreenshotsByJobId(agent.id);
+        if (!active) return;
+        setScreenshots((prev) => {
+          if (data.length === prev.length) return prev;
+          // Auto-scroll timeline to bottom when new screenshots arrive
+          setTimeout(() => {
+            scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+          }, 50);
+          return data;
+        });
+      } catch {
+        // ignore errors during polling
+      }
+    }
+
+    poll();
+    const interval = setInterval(poll, 500);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [agent.id]);
+
+  // The "live view" shows either a selected screenshot or the latest one
+  const displayScreenshot =
+    selectedIndex !== null
+      ? screenshots[selectedIndex]
+      : screenshots[screenshots.length - 1] ?? null;
+
+  const displayUrl = displayScreenshot?.pageUrl || agent.currentStep;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -193,20 +155,30 @@ export function AgentOverlay({ agent, onClose }: AgentOverlayProps) {
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
                 </div>
                 <div className="flex-1 bg-zinc-800 rounded px-3 py-1 ml-2">
-                  <p className="text-xs text-zinc-400 font-mono">{agentUrl}</p>
+                  <p className="text-xs text-zinc-400 font-mono truncate">{displayUrl}</p>
                 </div>
               </div>
-              {/* Screenshot placeholder */}
+              {/* Screenshot / placeholder */}
               <div className={cn(
                 "flex-1 min-h-0 relative flex items-center justify-center",
-                agent.status === "running" && "animate-pulse",
+                agent.status === "running" && !displayScreenshot && "animate-pulse",
               )}>
-                <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-white to-transparent" />
-                <div className="flex flex-col items-center gap-2 text-zinc-600">
-                  <Monitor className="w-12 h-12" />
-                  <span className="text-sm font-mono">Live View</span>
-                  <span className="text-xs text-zinc-700">{agent.currentStep}</span>
-                </div>
+                {displayScreenshot?.url ? (
+                  <img
+                    src={displayScreenshot.url}
+                    alt={displayScreenshot.pageTitle || "Screenshot"}
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                  />
+                ) : (
+                  <>
+                    <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-white to-transparent" />
+                    <div className="flex flex-col items-center gap-2 text-zinc-600">
+                      <Monitor className="w-12 h-12" />
+                      <span className="text-sm font-mono">Live View</span>
+                      <span className="text-xs text-zinc-700">{agent.currentStep}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -215,39 +187,60 @@ export function AgentOverlay({ agent, onClose }: AgentOverlayProps) {
           <div className="w-64 border-l border-border flex flex-col shrink-0">
             <div className="px-3 py-3 border-b border-border shrink-0">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Screenshots ({snapshots.length})
+                Screenshots ({screenshots.length})
               </p>
             </div>
-            <div className="flex-1 overflow-auto p-2 space-y-2">
-              {snapshots.map((snap, i) => {
-                const isLatest = i === snapshots.length - 1;
-                return (
-                  <div
-                    key={i}
-                    className={cn(
-                      "rounded-lg border overflow-hidden cursor-pointer transition-colors",
-                      isLatest
-                        ? "border-emerald-500/50 ring-1 ring-emerald-500/20"
-                        : "border-zinc-800 hover:border-zinc-600"
-                    )}
-                  >
-                    {/* Mini browser chrome */}
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-900/80 border-b border-zinc-800">
-                      <div className="flex gap-0.5">
-                        <div className="w-1 h-1 rounded-full bg-red-500/40" />
-                        <div className="w-1 h-1 rounded-full bg-yellow-500/40" />
-                        <div className="w-1 h-1 rounded-full bg-green-500/40" />
+            <div ref={scrollRef} className="flex-1 overflow-auto p-2 space-y-2">
+              {screenshots.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-zinc-700">
+                  <Monitor className="w-6 h-6 mb-1" />
+                  <span className="text-[10px] font-mono">Waiting for screenshots...</span>
+                </div>
+              ) : (
+                screenshots.map((snap, i) => {
+                  const isSelected = selectedIndex === i;
+                  const isLatest = selectedIndex === null && i === screenshots.length - 1;
+                  return (
+                    <div
+                      key={snap._id}
+                      className={cn(
+                        "rounded-lg border overflow-hidden cursor-pointer transition-colors",
+                        isSelected || isLatest
+                          ? "border-emerald-500/50 ring-1 ring-emerald-500/20"
+                          : "border-zinc-800 hover:border-zinc-600"
+                      )}
+                      onClick={() => setSelectedIndex(i)}
+                    >
+                      {/* Mini browser chrome */}
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-900/80 border-b border-zinc-800">
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-red-500/40" />
+                          <div className="w-1 h-1 rounded-full bg-yellow-500/40" />
+                          <div className="w-1 h-1 rounded-full bg-green-500/40" />
+                        </div>
+                        <p className="text-[7px] text-zinc-600 font-mono truncate ml-1">
+                          {snap.pageUrl || snap.pageTitle || `Step ${snap.stepNumber}`}
+                        </p>
                       </div>
-                      <p className="text-[7px] text-zinc-600 font-mono truncate ml-1">{snap.url}</p>
+                      {/* Thumbnail */}
+                      <div className="h-24 bg-zinc-950 relative flex items-center justify-center">
+                        {snap.url ? (
+                          <img
+                            src={snap.url}
+                            alt={snap.pageTitle || "Screenshot"}
+                            className="absolute inset-0 w-full h-full object-cover object-top"
+                          />
+                        ) : (
+                          <>
+                            <div className="absolute inset-0 opacity-[0.02] bg-gradient-to-br from-white to-transparent" />
+                            <Monitor className="w-4 h-4 text-zinc-800" />
+                          </>
+                        )}
+                      </div>
                     </div>
-                    {/* Screenshot placeholder */}
-                    <div className="h-24 bg-zinc-950 relative flex items-center justify-center">
-                      <div className="absolute inset-0 opacity-[0.02] bg-gradient-to-br from-white to-transparent" />
-                      <Monitor className="w-4 h-4 text-zinc-800" />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

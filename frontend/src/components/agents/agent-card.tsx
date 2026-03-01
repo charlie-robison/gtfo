@@ -76,9 +76,10 @@ interface AgentCardProps {
   agent: AgentSession;
   compact?: boolean;
   onClick?: () => void;
+  screenshotUrl?: string | null;
 }
 
-export function AgentCard({ agent, compact, onClick }: AgentCardProps) {
+export function AgentCard({ agent, compact, onClick, screenshotUrl }: AgentCardProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
 
@@ -118,7 +119,7 @@ export function AgentCard({ agent, compact, onClick }: AgentCardProps) {
             )}
           </div>
           {/* Live screenshot — fills remaining space */}
-          <AgentScreenshot url={agentUrl} status={agent.status} compact />
+          <AgentScreenshot url={agentUrl} status={agent.status} compact screenshotUrl={screenshotUrl} />
         </CardContent>
       </Card>
     );
@@ -155,6 +156,7 @@ export function AgentCard({ agent, compact, onClick }: AgentCardProps) {
         <AgentScreenshot
           url={siteUrls[agent.targetSite] || `https://${agent.targetSite.toLowerCase().replace(/\s+/g, "")}.com`}
           status={agent.status}
+          screenshotUrl={screenshotUrl}
         />
         {agent.status === "waiting_approval" && (
           <div className="flex justify-end">

@@ -392,69 +392,87 @@ async def run_order_furniture(params: dict):
 @app.post("/run-update-cashapp-address")
 async def run_update_cashapp_address(params: dict):
     """Run the Cash App address update skill."""
+    print(f"[CashApp] Received request with params: {list(params.keys())}")
     from server.skills.update_cashapp_address import update_cashapp_address
+    print("[CashApp] Skill imported OK")
 
     job_id = params.get("jobId", "")
     job_type = params.get("jobType", "update_cashapp_address")
     loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
-        await update_cashapp_address(
-            street_address=params["streetAddress"],
-            city=params["city"],
-            state=params["state"],
-            zip_code=params["zipCode"],
+        print("[CashApp] Starting skill...")
+        result = await update_cashapp_address(
+            street_address=params.get("streetAddress", ""),
+            city=params.get("city", ""),
+            state=params.get("state", ""),
+            zip_code=params.get("zipCode", ""),
             screenshot_loop=loop,
         )
+        print(f"[CashApp] Skill completed OK")
         return {"message": "Updated Cash App address!"}
 
     except Exception as e:
+        print(f"[CashApp] ERROR: {type(e).__name__}: {e}")
+        import traceback; traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
 
 
 @app.post("/run-update-southwest-address")
 async def run_update_southwest_address(params: dict):
     """Run the Southwest Airlines address update skill."""
+    print(f"[Southwest] Received request with params: {list(params.keys())}")
     from server.skills.update_southwest_address import update_southwest_address
+    print("[Southwest] Skill imported OK")
 
     job_id = params.get("jobId", "")
     job_type = params.get("jobType", "update_southwest_address")
     loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
-        await update_southwest_address(
-            street_address=params["streetAddress"],
-            city=params["city"],
-            state=params["state"],
-            zip_code=params["zipCode"],
+        print("[Southwest] Starting skill...")
+        result = await update_southwest_address(
+            street_address=params.get("streetAddress", ""),
+            city=params.get("city", ""),
+            state=params.get("state", ""),
+            zip_code=params.get("zipCode", ""),
             screenshot_loop=loop,
         )
+        print(f"[Southwest] Skill completed OK")
         return {"message": "Updated Southwest Airlines address!"}
 
     except Exception as e:
+        print(f"[Southwest] ERROR: {type(e).__name__}: {e}")
+        import traceback; traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
 
 
 @app.post("/run-update-doordash-address")
 async def run_update_doordash_address(params: dict):
     """Run the DoorDash address update skill."""
+    print(f"[DoorDash] Received request with params: {list(params.keys())}")
     from server.skills.update_doordash_address import update_doordash_address
+    print("[DoorDash] Skill imported OK")
 
     job_id = params.get("jobId", "")
     job_type = params.get("jobType", "update_doordash_address")
     loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
-        await update_doordash_address(
-            street_address=params["streetAddress"],
-            city=params["city"],
-            state=params["state"],
-            zip_code=params["zipCode"],
+        print("[DoorDash] Starting skill...")
+        result = await update_doordash_address(
+            street_address=params.get("streetAddress", ""),
+            city=params.get("city", ""),
+            state=params.get("state", ""),
+            zip_code=params.get("zipCode", ""),
             screenshot_loop=loop,
         )
+        print(f"[DoorDash] Skill completed OK")
         return {"message": "Updated DoorDash address!"}
 
     except Exception as e:
+        print(f"[DoorDash] ERROR: {type(e).__name__}: {e}")
+        import traceback; traceback.print_exc()
         return {"error": f"{type(e).__name__}: {e}"}
 
 

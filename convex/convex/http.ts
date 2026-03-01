@@ -128,11 +128,11 @@ http.route({
     const body = await request.json();
 
     const params = {
-      fullName: body.full_name,
-      streetAddress: body.street_address,
-      city: body.city,
-      state: body.state,
-      zipCode: body.zip_code,
+      fullName: body.full_name ?? body.fullName ?? "",
+      streetAddress: body.street_address ?? body.streetAddress ?? "",
+      city: body.city ?? "",
+      state: body.state ?? "",
+      zipCode: body.zip_code ?? body.zipCode ?? "",
       phone: body.phone ?? "",
     };
 
@@ -198,10 +198,10 @@ http.route({
     const body = await request.json();
 
     const params = {
-      streetAddress: body.street_address,
-      city: body.city,
-      state: body.state,
-      zipCode: body.zip_code,
+      streetAddress: body.street_address ?? body.streetAddress ?? "",
+      city: body.city ?? "",
+      state: body.state ?? "",
+      zipCode: body.zip_code ?? body.zipCode ?? "",
     };
 
     const jobId = await ctx.runMutation(api.mutations.createJob, {
@@ -230,10 +230,10 @@ http.route({
     const body = await request.json();
 
     const params = {
-      streetAddress: body.street_address,
-      city: body.city,
-      state: body.state,
-      zipCode: body.zip_code,
+      streetAddress: body.street_address ?? body.streetAddress ?? "",
+      city: body.city ?? "",
+      state: body.state ?? "",
+      zipCode: body.zip_code ?? body.zipCode ?? "",
     };
 
     const jobId = await ctx.runMutation(api.mutations.createJob, {
@@ -262,10 +262,10 @@ http.route({
     const body = await request.json();
 
     const params = {
-      streetAddress: body.street_address,
-      city: body.city,
-      state: body.state,
-      zipCode: body.zip_code,
+      streetAddress: body.street_address ?? body.streetAddress ?? "",
+      city: body.city ?? "",
+      state: body.state ?? "",
+      zipCode: body.zip_code ?? body.zipCode ?? "",
     };
 
     const jobId = await ctx.runMutation(api.mutations.createJob, {
@@ -455,6 +455,23 @@ http.route({
 
 http.route({
   path: "/redfin-applications",
+  method: "OPTIONS",
+  handler: httpAction(async () => corsPreflightResponse()),
+});
+
+// ── GET /detected-services ─────────────────────────────────────
+
+http.route({
+  path: "/detected-services",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const data = await ctx.runQuery(api.queries.listDetectedServices);
+    return jsonResponse(data);
+  }),
+});
+
+http.route({
+  path: "/detected-services",
   method: "OPTIONS",
   handler: httpAction(async () => corsPreflightResponse()),
 });

@@ -1,26 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PipelineBar } from "@/components/dashboard/pipeline-bar";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { AgentCard } from "@/components/agents/agent-card";
 import { AgentOverlay } from "@/components/agents/agent-overlay";
-import { mockAgents } from "@/data/mock-agents";
+import { useJobStreams, type JobStream } from "@/hooks/use-job-streams";
 import { AgentSession } from "@/types";
+import { Loader2 } from "lucide-react";
+
+/** Map a Convex job status to the AgentSession status the UI expects. */
+function mapJobStatus(status: string): AgentSession["status"] {
+  switch (status) {
+    case "running":
+      return "running";
+    case "pending":
+      return "initializing";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    default:
+      return "running";
+  }
+}
+
+/** Friendly label for job types. */
+const jobTypeLabels: Record<string, string> = {
+  search_rentals: "Redfin Search",
+  order_uhaul: "U-Haul Booking",
+  update_amazon_address: "Amazon",
+  order_furniture: "Amazon Furniture",
+  update_cashapp_address: "Cash App",
+  update_southwest_address: "Southwest",
+  update_doordash_address: "DoorDash",
+  determine_addresses: "Address Scan",
+  cancel_lease: "Lease Cancellation",
+};
+
+/** Build an AgentSession from a JobStream so existing card/overlay components work. */
+function toAgentSession(stream: JobStream): AgentSession {
+  const { job, latestScreenshot } = stream;
+  return {
+    id: job._id,
+    targetSite: jobTypeLabels[job.type] ?? job.type,
+    status: mapJobStatus(job.status),
+    currentStep: latestScreenshot?.pageTitle || `Job ${job.status}`,
+    startedAt: new Date().toISOString(),
+    elapsedSeconds: 0,
+    logs: [],
+    screenshotUrl: latestScreenshot?.url ?? undefined,
+  };
+}
 
 export default function DashboardPage() {
-  const [selectedAgent, setSelectedAgent] = useState<AgentSession | null>(null);
+  const { streams, loading, error } = useJobStreams();
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  const sortOrder = [
-    "waiting_approval",
-    "running",
-    "initializing",
-    "completed",
-    "failed",
-  ];
-  const sorted = [...mockAgents].sort(
-    (a, b) => sortOrder.indexOf(a.status) - sortOrder.indexOf(b.status)
-  );
+  // Sort: running first, then pending/initializing
+  const sorted = useMemo(() => {
+    const order = ["running", "pending"];
+    return [...streams].sort(
+      (a, b) => order.indexOf(a.job.status) - order.indexOf(b.job.status)
+    );
+  }, [streams]);
+
+  const selectedStream = sorted.find((s) => s.job._id === selectedJobId) ?? null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-6.5rem)] gap-3">
@@ -31,16 +76,35 @@ export default function DashboardPage() {
       <div className="flex-1 min-h-0 flex gap-3">
         {/* Live Agents grid — direction trick puts scrollbar on left */}
         <div className="flex-1 min-w-0 overflow-auto" dir="rtl">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 auto-rows-[minmax(200px,1fr)]" dir="ltr">
-            {sorted.map((agent) => (
-              <AgentCard
-                key={agent.id}
-                agent={agent}
-                compact
-                onClick={() => setSelectedAgent(agent)}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center h-full" dir="ltr">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading jobs...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-full" dir="ltr">
+              <p className="text-sm text-red-400">Failed to load jobs: {error}</p>
+            </div>
+          ) : sorted.length === 0 ? (
+            <div className="flex items-center justify-center h-full" dir="ltr">
+              <p className="text-sm text-muted-foreground">No active jobs running.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 auto-rows-[minmax(200px,1fr)]" dir="ltr">
+              {sorted.map((stream) => {
+                const agent = toAgentSession(stream);
+                return (
+                  <AgentCard
+                    key={stream.job._id}
+                    agent={agent}
+                    compact
+                    screenshotUrl={stream.latestScreenshot?.url}
+                    onClick={() => setSelectedJobId(stream.job._id)}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Activity feed sidebar */}
@@ -50,10 +114,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Agent detail overlay */}
-      {selectedAgent && (
+      {selectedStream && (
         <AgentOverlay
-          agent={selectedAgent}
-          onClose={() => setSelectedAgent(null)}
+          agent={toAgentSession(selectedStream)}
+          onClose={() => setSelectedJobId(null)}
         />
       )}
     </div>

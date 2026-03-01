@@ -20,7 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CASHAPP_EMAIL = os.getenv("AMAZON_EMAIL", "")
-CASHAPP_PIN = os.getenv("AMAZON_PASSWORD", "")
+CASHAPP_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
+CASHAPP_PIN = os.getenv("CASHAPP_PIN", "")
 
 
 async def update_cashapp_address(
@@ -51,8 +52,7 @@ STEP 1 — Log in with email:
 STEP 2 — Retrieve verification code from email:
 1. Open a NEW TAB and go to https://mail.google.com/
 2. If prompted to sign in to Gmail, enter email x_cashapp_email, click Next.
-   If a password is needed, try x_cashapp_email again or look for any
-   "Sign in with Google" option.
+   If a password is needed, enter x_cashapp_pass and click Next.
 3. Once in the inbox, look for the most recent email from Cash App
    (sender may contain "cash", "square", or "Cash App").
 4. Open the email and find the verification code / sign-in code.
@@ -115,6 +115,7 @@ STEP 6 — Confirm:
         browser=browser,
         sensitive_data={
             "x_cashapp_email": CASHAPP_EMAIL,
+            "x_cashapp_pass": CASHAPP_PASSWORD,
             "x_cashapp_pin": CASHAPP_PIN,
         },
         use_vision=True,
@@ -128,7 +129,6 @@ STEP 6 — Confirm:
     finally:
         if bg_task:
             bg_task.cancel()
-
     return result
 
 

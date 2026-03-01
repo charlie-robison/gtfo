@@ -64,6 +64,13 @@ export const listAmazonOrderSummary = query({
   },
 });
 
+export const listDetectedServices = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("detected_services").collect();
+  },
+});
+
 export const listScreenshotsByJobType = query({
   args: { jobType: v.string() },
   handler: async (ctx, args) => {
