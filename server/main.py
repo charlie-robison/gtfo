@@ -241,7 +241,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no extra text):
 }}"""
 
     house_response = await openai.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         max_tokens=1024,
         messages=[{
             "role": "user",
@@ -299,7 +299,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no extra text):
 }}"""
 
     furniture_response = await openai.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         max_tokens=2048,
         messages=[{
             "role": "user",
