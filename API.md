@@ -323,6 +323,44 @@ List all furniture items recommended by the moving pipeline.
 
 ---
 
+### GET /screenshots
+
+`https://amiable-viper-68.convex.site/screenshots`
+
+List screenshots captured during browser-use skill sessions. Filter by job type or specific job ID.
+
+**Query params:** `?job_type=search_rentals` or `?job_id=jd7...` (at least one required)
+
+**Output:**
+
+```json
+[
+  {
+    "_id": "...",
+    "_creationTime": 1709312345678,
+    "jobId": "jd7...",
+    "jobType": "search_rentals",
+    "stepNumber": 3,
+    "pageUrl": "https://redfin.com/...",
+    "pageTitle": "Redfin - Apartments for Rent",
+    "storageId": "...",
+    "url": "https://amiable-viper-68.convex.cloud/api/storage/..."
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| jobId | id | Reference to the job that produced this screenshot |
+| jobType | string | `search_rentals` \| `order_uhaul` \| `update_address` \| `order_furniture` |
+| stepNumber | number | Zero-indexed step in the agent's history |
+| pageUrl | string | URL the browser was on when the screenshot was taken |
+| pageTitle | string | Page title at the time of the screenshot |
+| storageId | id | Convex file storage reference |
+| url | string | Resolved public URL to the screenshot image (PNG) |
+
+---
+
 ### GET /amazon-order-summary
 
 `https://amiable-viper-68.convex.site/amazon-order-summary`
@@ -353,6 +391,7 @@ List all Amazon order summaries from furniture ordering.
 | GET | `/redfin-applications` | List all Redfin applications |
 | GET | `/uhaul-information` | List all U-Haul reservations |
 | GET | `/recommended-furniture` | List all recommended furniture |
+| GET | `/screenshots` | List screenshots by `?job_type=` or `?job_id=` |
 | GET | `/amazon-order-summary` | List all Amazon order summaries |
 
 All endpoints are at `https://amiable-viper-68.convex.site`.
@@ -374,6 +413,8 @@ These queries can also be called directly via the Convex React/JS client (real-t
 | `api.queries.listUhaulInformation` | List all U-Haul reservations |
 | `api.queries.listRecommendedFurniture` | List all recommended furniture |
 | `api.queries.listAmazonOrderSummary` | List all Amazon order summaries |
+| `api.queries.listScreenshotsByJobType` | List screenshots by job type (with resolved URLs) |
+| `api.queries.listScreenshotsByJobId` | List screenshots by job ID (with resolved URLs) |
 
 ---
 

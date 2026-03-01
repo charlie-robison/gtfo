@@ -142,6 +142,20 @@ export const insertAmazonOrderSummary = mutation({
   },
 });
 
+export const insertScreenshot = mutation({
+  args: {
+    jobId: v.id("jobs"),
+    jobType: v.string(),
+    stepNumber: v.number(),
+    pageUrl: v.string(),
+    pageTitle: v.string(),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("screenshots", args);
+  },
+});
+
 export const getLatestSearchConstraints = mutation({
   args: {},
   handler: async (ctx) => {

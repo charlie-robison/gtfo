@@ -5,6 +5,30 @@
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
+
+async function storeScreenshots(
+  ctx: any,
+  screenshots: any[],
+  jobId: Id<"jobs">,
+  jobType: string,
+) {
+  for (const s of screenshots) {
+    const binary = Uint8Array.from(atob(s.screenshotBase64), (c) =>
+      c.charCodeAt(0),
+    );
+    const blob = new Blob([binary], { type: "image/png" });
+    const storageId = await ctx.storage.store(blob);
+    await ctx.runMutation(api.mutations.insertScreenshot, {
+      jobId,
+      jobType,
+      stepNumber: s.stepNumber ?? 0,
+      pageUrl: s.pageUrl ?? "",
+      pageTitle: s.pageTitle ?? "",
+      storageId,
+    });
+  }
+}
 
 function getFastapiUrl(): string {
   const url = process.env.FASTAPI_URL;
@@ -59,6 +83,8 @@ export const runSearchRentals = action({
         });
       }
 
+      await storeScreenshots(ctx, result.screenshots ?? [], jobId, "search_rentals");
+
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,
         result: { listingsCount: listings.length },
@@ -97,6 +123,8 @@ export const runOrderUhaul = action({
       }
 
       const uhaulData = await resp.json();
+
+      await storeScreenshots(ctx, uhaulData.screenshots ?? [], jobId, "order_uhaul");
 
       await ctx.runMutation(api.mutations.insertUhaulInformation, {
         vehicle: uhaulData.vehicle ?? "",
@@ -148,6 +176,8 @@ export const runUpdateAddress = action({
 
       const result = await resp.json();
 
+      await storeScreenshots(ctx, result.screenshots ?? [], jobId, "update_address");
+
       await ctx.runMutation(api.mutations.completeJob, {
         jobId,
         result: result.message ?? "Updated all addresses to new address!",
@@ -186,6 +216,8 @@ export const runOrderFurniture = action({
       }
 
       const result = await resp.json();
+
+      await storeScreenshots(ctx, result.screenshots ?? [], jobId, "order_furniture");
 
       await ctx.runMutation(api.mutations.insertAmazonOrderSummary, {
         summary: result.summary ?? "",
