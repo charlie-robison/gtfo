@@ -14,6 +14,7 @@ import json
 import requests as _requests
 from browser_use import Agent, Browser, ChatBrowserUse
 from dotenv import load_dotenv
+from server.skills import disable_crashy_watchdogs
 
 load_dotenv()
 
@@ -177,11 +178,7 @@ async def _fast_scrape(
         bg_task = asyncio.create_task(screenshot_loop(browser))
     try:
         await browser.start()
-        # Disable PopupsWatchdog — Redfin opens tabs that the watchdog
-        # considers "disallowed" and closes them, which can detach the
-        # agent's focused target and crash the entire session.
-        if getattr(browser, "_popups_watchdog", None) is not None:
-            browser._popups_watchdog = None
+        disable_crashy_watchdogs(browser)
         await browser.navigate_to(url)
         # Wait for listing cards to render
         await asyncio.sleep(3)
@@ -251,9 +248,7 @@ Return the final result as the JSON array. Do NOT open individual listing pages.
     )
 
     await browser.start()
-    # Disable PopupsWatchdog — same reason as fast path above.
-    if getattr(browser, "_popups_watchdog", None) is not None:
-        browser._popups_watchdog = None
+    disable_crashy_watchdogs(browser)
 
     llm = ChatBrowserUse()
     agent = Agent(

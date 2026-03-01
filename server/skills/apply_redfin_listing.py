@@ -12,6 +12,7 @@ import asyncio
 import os
 from browser_use import Agent, Browser, ChatBrowserUse
 from dotenv import load_dotenv
+from server.skills import disable_crashy_watchdogs
 
 load_dotenv()
 
@@ -75,6 +76,8 @@ If you see a CAPTCHA, wait 10 seconds then attempt to solve it.
         keep_alive=True,
         enable_default_extensions=False,
     )
+    await browser.start()
+    disable_crashy_watchdogs(browser)
 
     llm = ChatBrowserUse()
     agent = Agent(

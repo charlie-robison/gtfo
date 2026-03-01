@@ -10,6 +10,7 @@ import asyncio
 import os
 from browser_use import Agent, Browser, ChatBrowserUse
 from dotenv import load_dotenv
+from server.skills import disable_crashy_watchdogs
 
 load_dotenv()
 
@@ -67,6 +68,7 @@ Do NOT enter payment or place the order. Report a summary of cart items and tota
     # Start browser and disable WebAuthn/passkey API via CDP
     # This prevents the iCloud Keychain "Use a saved passkey" dialog
     await browser.start()
+    disable_crashy_watchdogs(browser)
     await browser._cdp_add_init_script(_CDP_DISABLE_WEBAUTHN)
 
     agent = Agent(

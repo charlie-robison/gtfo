@@ -16,6 +16,7 @@ import asyncio
 import os
 from browser_use import Agent, Browser, ChatBrowserUse
 from dotenv import load_dotenv
+from server.skills import disable_crashy_watchdogs
 
 load_dotenv()
 
@@ -99,6 +100,7 @@ STEP 6 — Confirm:
     )
 
     await browser.start()
+    disable_crashy_watchdogs(browser)
     await browser._cdp_add_init_script("""
         navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
         navigator.credentials.create = () => Promise.reject('WebAuthn disabled');

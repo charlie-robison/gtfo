@@ -9,6 +9,7 @@ import asyncio
 import os
 from browser_use import Agent, Browser, ChatBrowserUse
 from dotenv import load_dotenv
+from server.skills import disable_crashy_watchdogs
 
 load_dotenv()
 
@@ -71,6 +72,7 @@ Go to https://www.amazon.com/a/addresses and do the following:
     # Start browser and disable WebAuthn/passkey API via CDP
     # This prevents the iCloud Keychain "Use a saved passkey" dialog
     await browser.start()
+    disable_crashy_watchdogs(browser)
     await browser._cdp_add_init_script("""
         navigator.credentials.get = () => Promise.reject('WebAuthn disabled');
         navigator.credentials.create = () => Promise.reject('WebAuthn disabled');
