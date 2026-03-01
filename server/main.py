@@ -5,22 +5,28 @@ Pure skill/agent execution layer. No database operations.
 Convex handles all reads, writes, and job management.
 
 Endpoints:
-  POST /run-search-rentals     — Run Redfin search skill, return parsed listings
-  POST /run-moving-analysis    — Run GPT-4o house analysis + furniture recs
-  POST /run-order-uhaul        — Run U-Haul ordering skill, return parsed result
-  POST /run-update-address     — Run Amazon address update skill
-  POST /run-order-furniture    — Run Amazon furniture cart skill
+  POST /run-search-rentals           — Run Redfin search skill, return parsed listings
+  POST /run-moving-analysis          — Run GPT-4o house analysis + furniture recs
+  POST /run-order-uhaul              — Run U-Haul ordering skill, return parsed result
+  POST /run-update-address           — Run Amazon address update skill
+  POST /run-order-furniture          — Run Amazon furniture cart skill
+  POST /run-update-cashapp-address   — Run Cash App address update skill
+  POST /run-update-southwest-address — Run Southwest address update skill
+  POST /run-update-doordash-address  — Run DoorDash address update skill
 
 Run:
   cd server && uvicorn main:app --reload
 """
 
+import asyncio
 import base64
 import json
+import os
 import sys
 import traceback
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +36,8 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from server.utils import parse_redfin_results, parse_uhaul_result
+
+CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
 
 app = FastAPI(title="Automovers Skill Runner")
 
@@ -57,6 +65,67 @@ def _strip_markdown_fences(text: str) -> str:
         lines = text.split("\n")
         return "\n".join(l for l in lines if not l.strip().startswith("```"))
     return text
+
+
+# ── Screenshot Loop ─────────────────────────────────────────────
+
+
+async def push_screenshot_to_convex(
+    job_id: str,
+    job_type: str,
+    step: int,
+    url: str,
+    title: str,
+    b64: str,
+) -> None:
+    """POST a single screenshot to the Convex HTTP endpoint for storage."""
+    if not CONVEX_SITE_URL:
+        return
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{CONVEX_SITE_URL}/screenshots/upload",
+            json={
+                "jobId": job_id,
+                "jobType": job_type,
+                "stepNumber": step,
+                "pageUrl": url,
+                "pageTitle": title,
+                "screenshotBase64": b64,
+            },
+            timeout=30,
+        )
+
+
+def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
+    """Return an async function that periodically captures browser screenshots."""
+
+    async def _loop(browser):
+        step = 0
+        while True:
+            try:
+                page = await browser.get_current_page()
+                if page:
+                    screenshot_b64 = await page.screenshot()
+                    url = page.url if hasattr(page, "url") else ""
+                    title = (
+                        await page.title()
+                        if callable(getattr(page, "title", None))
+                        else ""
+                    )
+                    await push_screenshot_to_convex(
+                        job_id=job_id,
+                        job_type=job_type,
+                        step=step,
+                        url=url or "",
+                        title=title or "",
+                        b64=screenshot_b64,
+                    )
+                    step += 1
+            except Exception:
+                pass
+            await asyncio.sleep(interval)
+
+    return _loop
 
 
 # ── Skill Endpoints ──────────────────────────────────────────────
@@ -246,6 +315,9 @@ async def run_update_address(params: dict):
     """Run the Amazon address update skill."""
     from server.skills.update_amazon_address import update_amazon_address
 
+    job_id = params.get("jobId", "")
+    screenshot_loop = make_screenshot_loop(job_id, "update_address") if job_id else None
+
     try:
         await update_amazon_address(
             full_name=params["fullName"],
@@ -254,6 +326,7 @@ async def run_update_address(params: dict):
             state=params["state"],
             zip_code=params["zipCode"],
             phone=params.get("phone", ""),
+            screenshot_loop=screenshot_loop,
         )
         return {"message": "Updated all addresses to new address!"}
 
@@ -269,6 +342,72 @@ async def run_order_furniture(params: dict):
     try:
         result = await amazon_furniture_cart(furniture_items=params["items"])
         return {"summary": str(result)}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-update-cashapp-address")
+async def run_update_cashapp_address(params: dict):
+    """Run the Cash App address update skill."""
+    from server.skills.update_cashapp_address import update_cashapp_address
+
+    job_id = params.get("jobId", "")
+    screenshot_loop = make_screenshot_loop(job_id, "update_cashapp_address") if job_id else None
+
+    try:
+        await update_cashapp_address(
+            street_address=params["streetAddress"],
+            city=params["city"],
+            state=params["state"],
+            zip_code=params["zipCode"],
+            screenshot_loop=screenshot_loop,
+        )
+        return {"message": "Updated Cash App address!"}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-update-southwest-address")
+async def run_update_southwest_address(params: dict):
+    """Run the Southwest Airlines address update skill."""
+    from server.skills.update_southwest_address import update_southwest_address
+
+    job_id = params.get("jobId", "")
+    screenshot_loop = make_screenshot_loop(job_id, "update_southwest_address") if job_id else None
+
+    try:
+        await update_southwest_address(
+            street_address=params["streetAddress"],
+            city=params["city"],
+            state=params["state"],
+            zip_code=params["zipCode"],
+            screenshot_loop=screenshot_loop,
+        )
+        return {"message": "Updated Southwest Airlines address!"}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-update-doordash-address")
+async def run_update_doordash_address(params: dict):
+    """Run the DoorDash address update skill."""
+    from server.skills.update_doordash_address import update_doordash_address
+
+    job_id = params.get("jobId", "")
+    screenshot_loop = make_screenshot_loop(job_id, "update_doordash_address") if job_id else None
+
+    try:
+        await update_doordash_address(
+            street_address=params["streetAddress"],
+            city=params["city"],
+            state=params["state"],
+            zip_code=params["zipCode"],
+            screenshot_loop=screenshot_loop,
+        )
+        return {"message": "Updated DoorDash address!"}
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
