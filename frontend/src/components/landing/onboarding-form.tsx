@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Upload, ImageIcon, X } from "lucide-react";
 import {
   searchRentals,
   cancelCurrentLease,
@@ -17,6 +17,29 @@ export function OnboardingForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreview(reader.result as string);
+      // Fake 2 sec analyzing
+      setAnalyzing(true);
+      setTimeout(() => setAnalyzing(false), 2000);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const removeImage = useCallback(() => {
+    setImagePreview(null);
+    setAnalyzing(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,6 +103,51 @@ export function OnboardingForm() {
     <Card className="w-full max-w-lg">
       <CardContent className="p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Image upload */}
+          <div className="space-y-2">
+            <Label>Photo of Current Home</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+            {imagePreview ? (
+              <div className="relative rounded-lg overflow-hidden border border-zinc-700">
+                <img
+                  src={imagePreview}
+                  alt="Home preview"
+                  className="w-full h-40 object-cover"
+                />
+                {analyzing && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+                    <span className="text-sm font-medium text-emerald-400">Analyzing...</span>
+                  </div>
+                )}
+                {!analyzing && (
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 p-1 rounded-full bg-black/60 hover:bg-black/80 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-28 rounded-lg border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 transition-colors flex flex-col items-center justify-center gap-2 text-zinc-400 hover:text-emerald-400"
+              >
+                <Upload className="w-6 h-6" />
+                <span className="text-sm">Upload a photo of your home</span>
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="full-name">Full Name</Label>
@@ -190,7 +258,7 @@ export function OnboardingForm() {
             type="submit"
             className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2"
             size="lg"
-            disabled={loading}
+            disabled={loading || analyzing}
           >
             {loading ? (
               <>

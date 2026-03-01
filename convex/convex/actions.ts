@@ -618,80 +618,89 @@ export const runCancelLease = action({
 
 export const runMovingAnalysis = action({
   args: {
+    jobId: v.id("jobs"),
     destinationAddress: v.string(),
     date: v.string(),
     pickupTime: v.string(),
     initialAddress: v.string(),
   },
   handler: async (ctx, args) => {
-    // Call FastAPI for house analysis + furniture recs
-    const resp = await fetch(`${getFastapiUrl()}/run-moving-analysis`, {
-      method: "POST",
-      headers: fetchHeaders,
-      body: JSON.stringify({
-        destination_address: args.destinationAddress,
-        date: args.date,
-        pickup_time: args.pickupTime,
-      }),
-    });
+    await ctx.runMutation(api.mutations.updateJobStatus, { jobId: args.jobId, status: "running" });
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`FastAPI error ${resp.status}: ${text}`);
-    }
+    try {
+      // Call FastAPI for house analysis + furniture recs
+      const resp = await fetch(`${getFastapiUrl()}/run-moving-analysis`, {
+        method: "POST",
+        headers: fetchHeaders,
+        body: JSON.stringify({
+          destination_address: args.destinationAddress,
+          date: args.date,
+          pickup_time: args.pickupTime,
+        }),
+      });
 
-    const result = await resp.json();
-    const analysis = result.analysis;
-    const furnitureItems = result.furniture;
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`FastAPI error ${resp.status}: ${text}`);
+      }
 
-    // Write house analysis to Convex
-    await ctx.runMutation(api.mutations.insertHouseInformation, {
-      description: analysis.house_description ?? "",
-      estimatedBedrooms: analysis.estimated_bedrooms ?? 0,
-      estimatedSquareFootage: analysis.estimated_square_footage ?? 0,
-      stuffVolumeEstimate: analysis.stuff_volume_estimate ?? "",
-      recommendedTruckSize: analysis.recommended_truck_size ?? "",
-      reasoning: analysis.reasoning ?? "",
-      recommendedWorkers: analysis.recommended_workers ?? 0,
-      laborReasoning: analysis.labor_reasoning ?? "",
-    });
+      const result = await resp.json();
+      const analysis = result.analysis;
+      const furnitureItems = result.furniture;
 
-    // Write furniture items to Convex
-    for (const item of furnitureItems) {
-      await ctx.runMutation(api.mutations.insertRecommendedFurniture, {
-        itemName: item.item_name ?? "",
-        room: item.room ?? "",
-        amazonSearchQuery: item.amazon_search_query ?? "",
-        priority: item.priority ?? "essential",
+      // Write house analysis to Convex
+      await ctx.runMutation(api.mutations.insertHouseInformation, {
+        description: analysis.house_description ?? "",
+        estimatedBedrooms: analysis.estimated_bedrooms ?? 0,
+        estimatedSquareFootage: analysis.estimated_square_footage ?? 0,
+        stuffVolumeEstimate: analysis.stuff_volume_estimate ?? "",
+        recommendedTruckSize: analysis.recommended_truck_size ?? "",
+        reasoning: analysis.reasoning ?? "",
+        recommendedWorkers: analysis.recommended_workers ?? 0,
+        laborReasoning: analysis.labor_reasoning ?? "",
+      });
+
+      // Write furniture items to Convex
+      for (const item of furnitureItems) {
+        await ctx.runMutation(api.mutations.insertRecommendedFurniture, {
+          itemName: item.item_name ?? "",
+          room: item.room ?? "",
+          amazonSearchQuery: item.amazon_search_query ?? "",
+          priority: item.priority ?? "essential",
+        });
+      }
+
+      // Create U-Haul background job
+      const uhaulParams = {
+        pickupLocation: args.initialAddress,
+        dropoffLocation: args.destinationAddress,
+        pickupDate: args.date,
+        pickupTime: args.pickupTime,
+        vehicleType: analysis.recommended_truck_size ?? "15' Truck",
+        numWorkers: analysis.recommended_workers ?? 2,
+        loadingAddress: args.initialAddress,
+      };
+
+      const uhaulJobId = await ctx.runMutation(api.mutations.createJob, {
+        type: "order_uhaul",
+        params: uhaulParams,
+      });
+
+      // Schedule U-Haul ordering in background
+      await ctx.scheduler.runAfter(0, api.actions.runOrderUhaul, {
+        jobId: uhaulJobId,
+        params: uhaulParams,
+      });
+
+      await ctx.runMutation(api.mutations.completeJob, {
+        jobId: args.jobId,
+        result: { analysis, furnitureCount: furnitureItems.length, uhaulJobId },
+      });
+    } catch (e: any) {
+      await ctx.runMutation(api.mutations.failJob, {
+        jobId: args.jobId,
+        errorMessage: e.message ?? String(e),
       });
     }
-
-    // Create U-Haul background job
-    const uhaulParams = {
-      pickupLocation: args.initialAddress,
-      dropoffLocation: args.destinationAddress,
-      pickupDate: args.date,
-      pickupTime: args.pickupTime,
-      vehicleType: analysis.recommended_truck_size ?? "15' Truck",
-      numWorkers: analysis.recommended_workers ?? 2,
-      loadingAddress: args.initialAddress,
-    };
-
-    const uhaulJobId = await ctx.runMutation(api.mutations.createJob, {
-      type: "order_uhaul",
-      params: uhaulParams,
-    });
-
-    // Schedule U-Haul ordering in background
-    await ctx.scheduler.runAfter(0, api.actions.runOrderUhaul, {
-      jobId: uhaulJobId,
-      params: uhaulParams,
-    });
-
-    return {
-      analysis,
-      furniture: furnitureItems,
-      uhaulJobId,
-    };
   },
 });

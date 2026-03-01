@@ -139,15 +139,22 @@ http.route({
     const constraints = await ctx.runMutation(api.mutations.getLatestSearchConstraints, {});
     const initialAddress = constraints?.initialAddress ?? "";
 
-    // Run the analysis action (calls FastAPI, writes to Convex)
-    const result = await ctx.runAction(api.actions.runMovingAnalysis, {
+    const params = {
       destinationAddress: body.destination_address,
       date: body.date,
       pickupTime: body.pickup_time ?? "10:00 AM",
       initialAddress,
+    };
+
+    const jobId = await ctx.runMutation(api.mutations.createJob, {
+      type: "moving_analysis",
+      params,
     });
 
-    return jsonResponse(result);
+    // Schedule in background — don't block the HTTP response
+    await ctx.scheduler.runAfter(0, api.actions.runMovingAnalysis, { jobId, ...params });
+
+    return jsonResponse({ job_id: jobId });
   }),
 });
 
