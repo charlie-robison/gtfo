@@ -5,7 +5,7 @@ import { AgentSession, AgentStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { X, Check, Clock, Loader2, AlertTriangle, XCircle, Monitor, Ban } from "lucide-react";
+import { X, Check, Clock, Loader2, AlertTriangle, XCircle, Monitor, Ban, Mail, type LucideIcon } from "lucide-react";
 import { getScreenshotsByJobId, type Screenshot } from "@/lib/endpoints";
 
 const statusConfig: Record<
@@ -54,9 +54,11 @@ interface AgentOverlayProps {
   agent: AgentSession;
   onClose: () => void;
   onCancel?: () => void;
+  /** When set, renders an email-themed display instead of browser chrome. */
+  heroIcon?: LucideIcon;
 }
 
-export function AgentOverlay({ agent, onClose, onCancel }: AgentOverlayProps) {
+export function AgentOverlay({ agent, onClose, onCancel, heroIcon: HeroIcon }: AgentOverlayProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
@@ -157,47 +159,95 @@ export function AgentOverlay({ agent, onClose, onCancel }: AgentOverlayProps) {
 
         {/* Main content — big screenshot left, snapshot strip right */}
         <div className="flex-1 min-h-0 flex">
-          {/* Live browser view */}
+          {/* Live browser view or email-themed hero */}
           <div className="flex-1 min-w-0 p-4 flex flex-col">
-            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Monitor className="w-3.5 h-3.5" />
-              Live Browser View
-            </p>
-            <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col">
-              {/* Browser chrome */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0">
-                <div className="flex gap-1">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
-                </div>
-                <div className="flex-1 bg-zinc-800 rounded px-3 py-1 ml-2">
-                  <p className="text-xs text-zinc-400 font-mono truncate">{displayUrl}</p>
-                </div>
-              </div>
-              {/* Screenshot / placeholder */}
-              <div className={cn(
-                "flex-1 min-h-0 relative flex items-center justify-center",
-                agent.status === "running" && !displayScreenshot && "animate-pulse",
-              )}>
-                {displayScreenshot?.url ? (
-                  <img
-                    src={displayScreenshot.url}
-                    alt={displayScreenshot.pageTitle || "Screenshot"}
-                    className="absolute inset-0 w-full h-full object-contain bg-black"
-                  />
-                ) : (
-                  <>
-                    <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-white to-transparent" />
-                    <div className="flex flex-col items-center gap-2 text-zinc-600">
-                      <Monitor className="w-12 h-12" />
-                      <span className="text-sm font-mono">Live View</span>
-                      <span className="text-xs text-zinc-700">{agent.currentStep}</span>
+            {HeroIcon ? (
+              <>
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-emerald-400/70" />
+                  <span className="text-emerald-400/70 font-medium">AgentMail</span>
+                </p>
+                <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col relative">
+                  {/* Subtle background gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.04] via-transparent to-blue-500/[0.04]" />
+                  {/* Email chrome bar */}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border-b border-zinc-800 shrink-0 relative z-10">
+                    <Mail className="w-4 h-4 text-emerald-500/60" />
+                    <span className="text-xs font-medium text-emerald-400/70">AgentMail</span>
+                    <div className="flex-1 bg-zinc-800 rounded px-3 py-1 ml-2">
+                      <p className="text-xs text-zinc-400 font-mono truncate">agentmail://inbox</p>
                     </div>
-                  </>
-                )}
-              </div>
-            </div>
+                    {(agent.status === "running" || agent.status === "initializing") && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        </span>
+                        <span className="text-[10px] text-zinc-500">processing</span>
+                      </span>
+                    )}
+                  </div>
+                  {/* Hero content */}
+                  <div className="flex-1 min-h-0 relative z-10 flex flex-col items-center justify-center gap-4">
+                    <div className={cn(
+                      "w-20 h-20 rounded-full border-2 border-emerald-500/20 bg-emerald-500/[0.07] flex items-center justify-center",
+                      (agent.status === "running" || agent.status === "initializing") && "animate-pulse"
+                    )}>
+                      <HeroIcon className="w-9 h-9 text-emerald-400/80" />
+                    </div>
+                    <div className="text-center max-w-sm">
+                      <p className="text-lg font-semibold text-zinc-200">{agent.targetSite}</p>
+                      <p className="text-sm text-zinc-500 mt-1">{agent.currentStep}</p>
+                      <p className="text-xs text-zinc-600 mt-3">
+                        Reading and sending emails via AgentMail
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Monitor className="w-3.5 h-3.5" />
+                  Live Browser View
+                </p>
+                <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col">
+                  {/* Browser chrome */}
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0">
+                    <div className="flex gap-1">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
+                    </div>
+                    <div className="flex-1 bg-zinc-800 rounded px-3 py-1 ml-2">
+                      <p className="text-xs text-zinc-400 font-mono truncate">{displayUrl}</p>
+                    </div>
+                  </div>
+                  {/* Screenshot / placeholder */}
+                  <div className={cn(
+                    "flex-1 min-h-0 relative flex items-center justify-center",
+                    agent.status === "running" && !displayScreenshot && "animate-pulse",
+                  )}>
+                    {displayScreenshot?.url ? (
+                      <img
+                        src={displayScreenshot.url}
+                        alt={displayScreenshot.pageTitle || "Screenshot"}
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
+                      />
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-white to-transparent" />
+                        <div className="flex flex-col items-center gap-2 text-zinc-600">
+                          <Monitor className="w-12 h-12" />
+                          <span className="text-sm font-mono">Live View</span>
+                          <span className="text-xs text-zinc-700">{agent.currentStep}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Screenshot timeline strip */}

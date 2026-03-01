@@ -77,7 +77,7 @@ function toAgentSession(stream: JobStream): AgentSession {
     id: job._id,
     targetSite: jobTypeLabels[job.type] ?? job.type,
     status: mapJobStatus(job.status),
-    currentStep: latestScreenshot?.pageTitle || `Job ${job.status}`,
+    currentStep: latestScreenshot?.pageTitle || job.status.charAt(0).toUpperCase() + job.status.slice(1),
     startedAt: new Date().toISOString(),
     elapsedSeconds: 0,
     logs: [],
@@ -186,6 +186,7 @@ export default function DashboardPage() {
             agent={overlayAgent}
             onClose={() => setSelectedJobId(null)}
             onCancel={isCancellable ? () => setCancelTarget({ jobId: selectedStream.job._id, label: overlayAgent.targetSite }) : undefined}
+            heroIcon={heroIcons[selectedStream.job.type]}
           />
         );
       })()}

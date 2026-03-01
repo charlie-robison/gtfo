@@ -73,6 +73,16 @@ def _strip_markdown_fences(text: str) -> str:
 # ── Helpers ──────────────────────────────────────────────────────
 
 
+_screenshot_client: httpx.AsyncClient | None = None
+
+
+def _get_screenshot_client() -> httpx.AsyncClient:
+    global _screenshot_client
+    if _screenshot_client is None or _screenshot_client.is_closed:
+        _screenshot_client = httpx.AsyncClient(timeout=30)
+    return _screenshot_client
+
+
 async def push_screenshot_to_convex(
     job_id: str,
     job_type: str,
@@ -84,19 +94,18 @@ async def push_screenshot_to_convex(
     """POST a single screenshot to the Convex HTTP endpoint for storage."""
     if not CONVEX_SITE_URL:
         return
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{CONVEX_SITE_URL}/screenshots/upload",
-            json={
-                "jobId": job_id,
-                "jobType": job_type,
-                "stepNumber": step,
-                "pageUrl": url,
-                "pageTitle": title,
-                "screenshotBase64": b64,
-            },
-            timeout=30,
-        )
+    client = _get_screenshot_client()
+    await client.post(
+        f"{CONVEX_SITE_URL}/screenshots/upload",
+        json={
+            "jobId": job_id,
+            "jobType": job_type,
+            "stepNumber": step,
+            "pageUrl": url,
+            "pageTitle": title,
+            "screenshotBase64": b64,
+        },
+    )
 
 
 def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
@@ -104,29 +113,35 @@ def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
 
     async def _loop(browser):
         step = 0
-        while True:
-            try:
-                page = await browser.get_current_page()
-                if page:
-                    screenshot_b64 = await page.screenshot()
-                    url = page.url if hasattr(page, "url") else ""
-                    title = ""
-                    try:
-                        title = await page.title() if callable(getattr(page, "title", None)) else ""
-                    except Exception:
-                        pass
-                    await push_screenshot_to_convex(
-                        job_id=job_id,
-                        job_type=job_type,
-                        step=step,
-                        url=url or "",
-                        title=title or "",
-                        b64=screenshot_b64,
-                    )
-                    step += 1
-            except Exception:
-                pass  # swallow errors so the agent doesn't crash
-            await asyncio.sleep(interval)
+        try:
+            while True:
+                try:
+                    page = await browser.get_current_page()
+                    if page:
+                        screenshot_b64 = await page.screenshot()
+                        url = page.url if hasattr(page, "url") else ""
+                        title = ""
+                        try:
+                            title = await page.title() if callable(getattr(page, "title", None)) else ""
+                        except Exception:
+                            pass
+                        # Shield upload from cancellation so it always completes
+                        await asyncio.shield(push_screenshot_to_convex(
+                            job_id=job_id,
+                            job_type=job_type,
+                            step=step,
+                            url=url or "",
+                            title=title or "",
+                            b64=screenshot_b64,
+                        ))
+                        step += 1
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass  # swallow errors so the agent doesn't crash
+                await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            pass  # job finished — exit quietly
 
     return _loop
 

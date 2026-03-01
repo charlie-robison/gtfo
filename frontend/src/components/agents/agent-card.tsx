@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AgentSession, AgentStatus } from "@/types";
 import { AgentScreenshot } from "./agent-screenshot";
 import { cn } from "@/lib/utils";
-import { Check, Loader2, AlertTriangle, XCircle, Ban, type LucideIcon } from "lucide-react";
+import { Check, Loader2, AlertTriangle, XCircle, Ban, Mail, type LucideIcon } from "lucide-react";
 
 const statusConfig: Record<
   AgentStatus,
@@ -139,13 +139,34 @@ export function AgentCard({ agent, compact, onClick, onCancel, screenshotUrl, he
           </div>
           {/* Live screenshot or hero display */}
           {HeroIcon ? (
-            <div className="flex-1 min-h-0 rounded overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col items-center justify-center gap-2">
-              <HeroIcon className={cn(
-                "w-10 h-10 text-emerald-500/60",
-                (agent.status === "running" || agent.status === "initializing") && "animate-pulse"
-              )} />
-              <p className="text-sm font-semibold text-zinc-300">{agent.targetSite}</p>
-              <p className="text-[10px] text-zinc-500">{agent.currentStep}</p>
+            <div className="flex-1 min-h-0 rounded overflow-hidden border border-zinc-800 bg-zinc-950 flex flex-col relative">
+              {/* Subtle background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.04] via-transparent to-blue-500/[0.04]" />
+              {/* Email chrome bar */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900/80 border-b border-zinc-800 shrink-0 relative z-10">
+                <Mail className="w-3 h-3 text-emerald-500/60" />
+                <span className="text-[9px] font-medium text-emerald-400/70">AgentMail</span>
+                <div className="flex-1" />
+                {(agent.status === "running" || agent.status === "initializing") && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-emerald-500/60 animate-pulse" />
+                    <span className="text-[8px] text-zinc-500">processing</span>
+                  </span>
+                )}
+              </div>
+              {/* Hero content */}
+              <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 relative z-10">
+                <div className={cn(
+                  "w-11 h-11 rounded-full border border-emerald-500/20 bg-emerald-500/[0.07] flex items-center justify-center",
+                  (agent.status === "running" || agent.status === "initializing") && "animate-pulse"
+                )}>
+                  <HeroIcon className="w-5 h-5 text-emerald-400/80" />
+                </div>
+                <div className="text-center px-3">
+                  <p className="text-xs font-semibold text-zinc-300">{agent.targetSite}</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">{agent.currentStep}</p>
+                </div>
+              </div>
             </div>
           ) : (
             <AgentScreenshot url={agentUrl} status={agent.status} compact screenshotUrl={screenshotUrl} />
