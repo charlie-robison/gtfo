@@ -73,4 +73,26 @@ export default defineSchema({
   amazon_order_summary: defineTable({
     summary: v.string(),
   }),
+
+  detected_services: defineTable({
+    serviceName: v.string(),
+    category: v.string(),
+    priority: v.string(),
+    detectedFrom: v.array(v.string()),
+    emailCount: v.number(),
+    settingsUrl: v.optional(v.string()),
+    needsAddressUpdate: v.boolean(),
+    sampleSender: v.string(),
+  }),
+
+  screenshots: defineTable({
+    jobId: v.id("jobs"),
+    jobType: v.string(), // search_rentals | order_uhaul | update_address | order_furniture
+    stepNumber: v.number(),
+    pageUrl: v.string(),
+    pageTitle: v.string(),
+    storageId: v.id("_storage"),
+  })
+    .index("by_job_type", ["jobType"])
+    .index("by_job_id", ["jobId"]),
 });

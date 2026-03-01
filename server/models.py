@@ -98,3 +98,23 @@ class UHaulInformation(BaseModel):
 
 class AmazonOrderSummary(BaseModel):
     summary: str = ""
+
+
+# ── Endpoint 5: Determine Addresses ─────────────────────────────
+
+class DetermineAddressesRequest(BaseModel):
+    old_street: str = ""
+    old_city: str = ""
+    old_state: str = ""
+    old_zip_code: str = ""
+
+
+# ── Endpoint 6: Cancel Current Lease ────────────────────────────
+
+class CancelLeaseRequest(BaseModel):
+    landlord_email: str
+    tenant_name: str
+    current_address: str
+    lease_end_date: str
+    move_out_date: str
+    reason: str = "I am relocating."

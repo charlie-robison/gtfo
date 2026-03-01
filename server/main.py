@@ -5,22 +5,26 @@ Pure skill/agent execution layer. No database operations.
 Convex handles all reads, writes, and job management.
 
 Endpoints:
-  POST /run-search-rentals     — Run Redfin search skill, return parsed listings
-  POST /run-moving-analysis    — Run GPT-4o house analysis + furniture recs
-  POST /run-order-uhaul        — Run U-Haul ordering skill, return parsed result
-  POST /run-update-address     — Run Amazon address update skill
-  POST /run-order-furniture    — Run Amazon furniture cart skill
+  POST /run-search-rentals        — Run Redfin search skill, return parsed listings
+  POST /run-moving-analysis       — Run GPT-4o house analysis + furniture recs
+  POST /run-order-uhaul           — Run U-Haul ordering skill, return parsed result
+  POST /run-update-address        — Run Amazon address update skill
+  POST /run-order-furniture       — Run Amazon furniture cart skill
+  POST /run-determine-addresses   — Scan Gmail for services with stored addresses
+  POST /run-cancel-lease          — Send lease cancellation email via AgentMail
 
 Run:
   cd server && uvicorn main:app --reload
 """
 
+import asyncio
 import base64
 import json
+import os
 import sys
-import traceback
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,7 +33,10 @@ from openai import AsyncOpenAI
 load_dotenv(Path(__file__).resolve().parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+CONVEX_SITE_URL = os.getenv("CONVEX_SITE_URL", "")
+
 from server.utils import parse_redfin_results, parse_uhaul_result
+from server.agent_mail import AgentMailClient, GmailClient, UserAddress, classify_services, scan_emails
 
 app = FastAPI(title="Automovers Skill Runner")
 
@@ -59,6 +66,67 @@ def _strip_markdown_fences(text: str) -> str:
     return text
 
 
+# ── Helpers ──────────────────────────────────────────────────────
+
+
+async def push_screenshot_to_convex(
+    job_id: str,
+    job_type: str,
+    step: int,
+    url: str,
+    title: str,
+    b64: str,
+) -> None:
+    """POST a single screenshot to the Convex HTTP endpoint for storage."""
+    if not CONVEX_SITE_URL:
+        return
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{CONVEX_SITE_URL}/screenshots/upload",
+            json={
+                "jobId": job_id,
+                "jobType": job_type,
+                "stepNumber": step,
+                "pageUrl": url,
+                "pageTitle": title,
+                "screenshotBase64": b64,
+            },
+            timeout=30,
+        )
+
+
+def make_screenshot_loop(job_id: str, job_type: str, interval: float = 0.5):
+    """Return an async function that periodically captures browser screenshots."""
+
+    async def _loop(browser):
+        step = 0
+        while True:
+            try:
+                page = await browser.get_current_page()
+                if page:
+                    screenshot_b64 = await page.screenshot()
+                    url = page.url if hasattr(page, "url") else ""
+                    title = ""
+                    try:
+                        title = await page.title() if callable(getattr(page, "title", None)) else ""
+                    except Exception:
+                        pass
+                    await push_screenshot_to_convex(
+                        job_id=job_id,
+                        job_type=job_type,
+                        step=step,
+                        url=url or "",
+                        title=title or "",
+                        b64=screenshot_b64,
+                    )
+                    step += 1
+            except Exception:
+                pass  # swallow errors so the agent doesn't crash
+            await asyncio.sleep(interval)
+
+    return _loop
+
+
 # ── Skill Endpoints ──────────────────────────────────────────────
 
 
@@ -66,6 +134,10 @@ def _strip_markdown_fences(text: str) -> str:
 async def run_search_rentals(params: dict):
     """Run the Redfin search skill and return parsed listings."""
     from server.skills.search_redfin_rentals import search_and_contact_redfin_rentals
+
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "search_rentals")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
 
     try:
         result = await search_and_contact_redfin_rentals(
@@ -78,6 +150,7 @@ async def run_search_rentals(params: dict):
             min_bedrooms=params.get("minBedrooms", 1),
             min_bathrooms=params.get("minBathrooms", 1),
             max_results=params.get("maxResults", 5),
+            screenshot_loop=loop,
         )
 
         agent_output = str(result)
@@ -223,6 +296,10 @@ async def run_order_uhaul(params: dict):
     """Run the U-Haul ordering skill and return parsed result."""
     from server.skills.order_uhaul import order_uhaul
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "order_uhaul")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
         result = await order_uhaul(
             pickup_location=params["pickupLocation"],
@@ -232,10 +309,12 @@ async def run_order_uhaul(params: dict):
             vehicle_type=params.get("vehicleType", "truck"),
             num_workers=params.get("numWorkers", 0),
             loading_address=params.get("loadingAddress", ""),
+            screenshot_loop=loop,
         )
 
         agent_output = str(result)
-        return parse_uhaul_result(agent_output)
+        parsed = parse_uhaul_result(agent_output)
+        return parsed
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
@@ -246,14 +325,19 @@ async def run_update_address(params: dict):
     """Run the Amazon address update skill."""
     from server.skills.update_amazon_address import update_amazon_address
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "update_address")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
-        await update_amazon_address(
+        result = await update_amazon_address(
             full_name=params["fullName"],
             street_address=params["streetAddress"],
             city=params["city"],
             state=params["state"],
             zip_code=params["zipCode"],
             phone=params.get("phone", ""),
+            screenshot_loop=loop,
         )
         return {"message": "Updated all addresses to new address!"}
 
@@ -266,9 +350,80 @@ async def run_order_furniture(params: dict):
     """Run the Amazon furniture cart skill."""
     from server.skills.amazon_furniture_cart import amazon_furniture_cart
 
+    job_id = params.get("jobId", "")
+    job_type = params.get("jobType", "order_furniture")
+    loop = make_screenshot_loop(job_id, job_type) if job_id else None
+
     try:
-        result = await amazon_furniture_cart(furniture_items=params["items"])
+        result = await amazon_furniture_cart(
+            furniture_items=params["items"],
+            screenshot_loop=loop,
+        )
         return {"summary": str(result)}
 
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/run-determine-addresses")
+async def run_determine_addresses(params: dict):
+    """Scan Gmail for services that likely store the user's address, classify them."""
+    old_address = None
+    if params.get("oldStreet"):
+        old_address = UserAddress(
+            street=params["oldStreet"],
+            city=params.get("oldCity", ""),
+            state=params.get("oldState", ""),
+            zip_code=params.get("oldZipCode", ""),
+        )
+
+    try:
+        # Gmail client + scanning are synchronous — run in a thread
+        loop = asyncio.get_event_loop()
+        gmail = await loop.run_in_executor(None, GmailClient)
+        user_email = await loop.run_in_executor(None, gmail.get_profile)
+
+        raw_hits, total = await loop.run_in_executor(
+            None, lambda: scan_emails(gmail, old_address=old_address)
+        )
+
+        if not raw_hits:
+            return {"services": [], "userEmail": user_email, "totalScanned": total}
+
+        services = await loop.run_in_executor(None, classify_services, raw_hits)
+
+        return {
+            "services": [svc.model_dump(mode="json") for svc in services],
+            "userEmail": user_email,
+            "totalScanned": total,
+        }
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}", "services": []}
+
+
+@app.post("/run-cancel-lease")
+async def run_cancel_lease(params: dict):
+    """Send a lease cancellation email via AgentMail."""
+    try:
+        loop = asyncio.get_event_loop()
+
+        def _send():
+            client = AgentMailClient()
+            client.send_lease_cancellation(
+                to_email=params["landlordEmail"],
+                tenant_name=params["tenantName"],
+                current_address=params["currentAddress"],
+                lease_end_date=params["leaseEndDate"],
+                move_out_date=params["moveOutDate"],
+                reason=params.get("reason", "I am relocating."),
+            )
+            return client.get_or_create_inbox()
+
+        inbox = await loop.run_in_executor(None, _send)
+
+        return {
+            "message": f"Lease cancellation sent to {params['landlordEmail']}",
+            "sentFrom": inbox,
+        }
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}

@@ -25,7 +25,7 @@ if (window.PublicKeyCredential) {
 }"""
 
 
-async def amazon_furniture_cart(furniture_items: list[str]) -> object:
+async def amazon_furniture_cart(furniture_items: list[str], screenshot_loop=None) -> object:
     """
     Search for furniture items on Amazon, add each to cart, and proceed to checkout.
 
