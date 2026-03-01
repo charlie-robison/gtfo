@@ -320,6 +320,10 @@ export const runOrderFurniture = action({
 
       const result = await resp.json();
 
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
       await ctx.runMutation(api.mutations.insertAmazonOrderSummary, {
         summary: result.summary ?? "",
       });

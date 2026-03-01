@@ -383,7 +383,8 @@ async def run_order_furniture(params: dict):
             furniture_items=params["items"],
             screenshot_loop=loop,
         )
-        return {"summary": str(result)}
+        summary = result.final_result() if hasattr(result, "final_result") else str(result)
+        return {"summary": summary or str(result)}
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
