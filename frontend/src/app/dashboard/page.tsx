@@ -41,16 +41,16 @@ function mapJobStatus(status: string): AgentSession["status"] {
 
 /** Friendly label for job types. */
 const jobTypeLabels: Record<string, string> = {
-  search_rentals: "Redfin Search",
-  order_uhaul: "U-Haul Booking",
-  update_amazon_address: "Amazon",
-  order_furniture: "Amazon Furniture",
-  update_cashapp_address: "Cash App",
-  update_southwest_address: "Southwest",
-  update_doordash_address: "DoorDash",
-  moving_analysis: "Moving Analysis",
-  determine_addresses: "Finding Sites to Change Addresses",
-  cancel_lease: "Send Cancel Email",
+  search_rentals: "Searching for Apartments",
+  order_uhaul: "Booking Moving Truck",
+  update_amazon_address: "Updating Amazon Address",
+  order_furniture: "Ordering Furniture",
+  update_cashapp_address: "Updating Cash App Address",
+  update_southwest_address: "Updating Southwest Address",
+  update_doordash_address: "Updating DoorDash Address",
+  moving_analysis: "Analyzing Move Details",
+  determine_addresses: "Scanning Email for Services",
+  cancel_lease: "Sending Lease Cancellation",
 };
 
 /** Job types that support cancellation. */
