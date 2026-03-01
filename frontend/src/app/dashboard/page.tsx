@@ -7,7 +7,9 @@ import { AgentCard } from "@/components/agents/agent-card";
 import { AgentOverlay } from "@/components/agents/agent-overlay";
 import { useJobStreams, type JobStream } from "@/hooks/use-job-streams";
 import { AgentSession } from "@/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { OverrideDialog } from "@/components/dashboard/override-dialog";
 
 /** Map a Convex job status to the AgentSession status the UI expects. */
 function mapJobStatus(status: string): AgentSession["status"] {
@@ -56,6 +58,7 @@ function toAgentSession(stream: JobStream): AgentSession {
 export default function DashboardPage() {
   const { streams, loading, error } = useJobStreams();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [overrideOpen, setOverrideOpen] = useState(false);
 
   // Sort: running first, then pending/initializing
   const sorted = useMemo(() => {
@@ -69,8 +72,22 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-6.5rem)] gap-3">
-      {/* Pipeline bar across the top */}
-      <PipelineBar />
+      {/* Pipeline bar + Override button */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <PipelineBar />
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2 shrink-0"
+          onClick={() => setOverrideOpen(true)}
+        >
+          <RefreshCw className="w-4 h-4" />
+          Override
+        </Button>
+      </div>
+
+      <OverrideDialog open={overrideOpen} onOpenChange={setOverrideOpen} />
 
       {/* Main content: agents + activity */}
       <div className="flex-1 min-h-0 flex gap-3">
