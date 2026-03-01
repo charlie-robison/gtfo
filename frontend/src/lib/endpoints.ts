@@ -249,6 +249,10 @@ export function determineAddresses(data: DetermineAddressesRequest) {
   return post<JobResponse>("/determine-addresses", data);
 }
 
+export function cancelJob(jobId: string) {
+  return post<{ ok: boolean }>("/cancel-job", { job_id: jobId });
+}
+
 export function setupUtilities() {
   return post<null>("/setup-utilities");
 }

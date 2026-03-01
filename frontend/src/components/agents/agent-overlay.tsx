@@ -5,7 +5,7 @@ import { AgentSession, AgentStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { X, Check, Clock, Loader2, AlertTriangle, XCircle, Monitor } from "lucide-react";
+import { X, Check, Clock, Loader2, AlertTriangle, XCircle, Monitor, Ban } from "lucide-react";
 import { getScreenshotsByJobId, type Screenshot } from "@/lib/endpoints";
 
 const statusConfig: Record<
@@ -37,6 +37,11 @@ const statusConfig: Record<
     className: "bg-red-500/10 text-red-400 border-red-500/20",
     icon: XCircle,
   },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+    icon: XCircle,
+  },
 };
 
 function formatElapsed(seconds: number): string {
@@ -48,9 +53,10 @@ function formatElapsed(seconds: number): string {
 interface AgentOverlayProps {
   agent: AgentSession;
   onClose: () => void;
+  onCancel?: () => void;
 }
 
-export function AgentOverlay({ agent, onClose }: AgentOverlayProps) {
+export function AgentOverlay({ agent, onClose, onCancel }: AgentOverlayProps) {
   const status = statusConfig[agent.status];
   const StatusIcon = status.icon;
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
@@ -130,6 +136,17 @@ export function AgentOverlay({ agent, onClose }: AgentOverlayProps) {
               <Button size="sm" className="bg-amber-600 hover:bg-amber-700 gap-1">
                 <Check className="w-3.5 h-3.5" />
                 Approve
+              </Button>
+            )}
+            {onCancel && (agent.status === "running" || agent.status === "initializing") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                onClick={onCancel}
+              >
+                <Ban className="w-3.5 h-3.5" />
+                Cancel
               </Button>
             )}
             <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">

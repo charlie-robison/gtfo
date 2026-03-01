@@ -45,6 +45,15 @@ export const failJob = mutation({
   },
 });
 
+export const cancelJob = mutation({
+  args: {
+    jobId: v.id("jobs"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.jobId, { status: "cancelled" });
+  },
+});
+
 export const insertStep = mutation({
   args: {
     stepNum: v.number(),
