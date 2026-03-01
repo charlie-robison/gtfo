@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SOUTHWEST_USERNAME = os.getenv("AMAZON_EMAIL", "")
+SOUTHWEST_USERNAME = os.getenv("SOUTHWEST_USERNAME", "")
 SOUTHWEST_PASSWORD = os.getenv("AMAZON_PASSWORD", "")
 
 
