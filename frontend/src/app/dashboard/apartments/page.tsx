@@ -165,12 +165,18 @@ export default function ApartmentsPage() {
             <CardContent className="p-5 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xl font-bold">
-                    ${listing.monthlyRentPrice.toLocaleString()}
-                    <span className="text-xs font-normal text-muted-foreground">/mo</span>
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{listing.address}</p>
-                  {listing.name && (
+                  {listing.monthlyRentPrice > 0 ? (
+                    <p className="text-xl font-bold">
+                      ${listing.monthlyRentPrice.toLocaleString()}
+                      <span className="text-xs font-normal text-muted-foreground">/mo</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Inquire about pricing
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-0.5">{listing.address || listing.name || "Rental Listing"}</p>
+                  {listing.name && listing.address && listing.name !== listing.address && (
                     <p className="text-xs text-muted-foreground truncate" title={listing.name}>
                       {listing.name}
                     </p>
@@ -189,22 +195,28 @@ export default function ApartmentsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Bed className="w-3.5 h-3.5" />
-                  {listing.numBedrooms} bd
-                </span>
-                <span className="flex items-center gap-1">
-                  <Bath className="w-3.5 h-3.5" />
-                  {listing.numBathrooms} ba
-                </span>
-                {listing.squareFootage > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Maximize className="w-3.5 h-3.5" />
-                    {listing.squareFootage.toLocaleString()} sqft
-                  </span>
-                )}
-              </div>
+              {(listing.numBedrooms > 0 || listing.numBathrooms > 0 || listing.squareFootage > 0) && (
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  {listing.numBedrooms > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Bed className="w-3.5 h-3.5" />
+                      {listing.numBedrooms} bd
+                    </span>
+                  )}
+                  {listing.numBathrooms > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Bath className="w-3.5 h-3.5" />
+                      {listing.numBathrooms} ba
+                    </span>
+                  )}
+                  {listing.squareFootage > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Maximize className="w-3.5 h-3.5" />
+                      {listing.squareFootage.toLocaleString()} sqft
+                    </span>
+                  )}
+                </div>
+              )}
 
               {listing.description && (
                 <p className="text-xs text-muted-foreground line-clamp-2">
